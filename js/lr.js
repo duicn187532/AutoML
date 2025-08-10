@@ -2,8 +2,8 @@
 (function(){
   const AML = window.AML;
   AML.getLRSchedulerCallback = function(model, baseLR=1e-3, scheduleType='constant', totalEpochs=50, options={}){
-    const stepSize = options.stepSize ?? 10;
-    const gamma = options.gamma ?? 0.5;
+    const stepSize = options.stepSize ?? 20;
+    const gamma = options.gamma ?? 0.8;
     const expK = options.expK ?? 0.05;
     let currentLR = baseLR;
     function lrOf(epoch){

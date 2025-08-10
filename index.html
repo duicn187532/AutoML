@@ -74,185 +74,185 @@
         </div>
     </section>
 
-<!-- 2) 模型設定 -->
-<section id="tab-config" class="hidden">
-    <div class="row">
-      <div class="card" style="flex:2;">
-        <h3>🧠 訓練模型設定</h3>
-  
-        <label>任務類型</label>
-        <select id="taskSelect">
-          <option value="auto">自動判斷</option>
-          <option value="classification">分類任務</option>
-          <option value="regression">回歸任務</option>
-        </select>
-  
-        <!-- A. 模式按鈕 -->
-        <div class="mode-group" id="modelModeGroup" style="margin:8px 0 12px;">
-          <button type="button" class="mode-btn active" data-mode="auto">
-            <div class="mode-title">🪄 自動選模型</div>
-            <div class="mode-desc">依任務與驗證分數自動挑最佳</div>
-          </button>
-          <button type="button" class="mode-btn" data-mode="preset">
-            <div class="mode-title">🎛️ 選擇內建模型</div>
-            <div class="mode-desc">點選卡片挑一個現成模型</div>
-          </button>
-          <button type="button" class="mode-btn" data-mode="custom">
-            <div class="mode-title">🧩 自訂模型層</div>
-            <div class="mode-desc">用積木建立自己的網路結構</div>
-          </button>
+    <!-- 2) 模型設定 -->
+    <section id="tab-config" class="hidden">
+        <div class="row">
+            <div class="card" style="flex:2;">
+                <h3>🧠 訓練模型設定</h3>
+
+                <label>任務類型</label>
+                <select id="taskSelect">
+                    <option value="auto">自動判斷</option>
+                    <option value="classification">分類任務</option>
+                    <option value="regression">回歸任務</option>
+                </select>
+
+                <!-- A. 模式按鈕 -->
+                <div class="mode-group" id="modelModeGroup" style="margin:8px 0 12px;">
+                    <button type="button" class="mode-btn active" data-mode="auto">
+                        <div class="mode-title">🪄 自動選模型</div>
+                        <div class="mode-desc">依任務與驗證分數自動挑最佳</div>
+                    </button>
+                    <button type="button" class="mode-btn" data-mode="preset">
+                        <div class="mode-title">🎛️ 選擇內建模型</div>
+                        <div class="mode-desc">點選卡片挑一個現成模型</div>
+                    </button>
+                    <button type="button" class="mode-btn" data-mode="custom">
+                        <div class="mode-title">🧩 自訂模型層</div>
+                        <div class="mode-desc">用積木建立自己的網路結構</div>
+                    </button>
+                </div>
+
+                <!-- B. 內建模型卡片容器（預設隱藏；JS 會塞卡片進來） -->
+                <div id="presetModels" class="model-grid hidden" style="margin-top:8px;"></div>
+
+                <!-- ✅ 自訂層容器（預設隱藏；custom 模式才顯示） -->
+                <div id="customLayersContainer" style="display:none; margin-top:12px;">
+                    <h4>📐 自訂層設定</h4>
+                    <div style="margin-bottom:8px;">
+                        <label for="layerTypeSelect">選擇層類型：</label>
+                        <select id="layerTypeSelect">
+                            <option value="dense">Dense（全連接層）</option>
+                            <option value="dropout">Dropout（隨機失活）</option>
+                            <option value="batchnorm">BatchNorm（批次正規化）</option>
+                            <option value="activation">Activation（激活函數）</option>
+                            <option value="flatten">Flatten（展平）</option>
+                        </select>
+                        <button type="button" onclick="addLayerFromUI()">➕ 新增層</button>
+                    </div>
+                    <!-- 🧱 層列表 -->
+                    <div id="layerList"></div>
+                </div>
+
+                <!-- 超參數區塊 -->
+                <div class="row" style="margin-top:10px;">
+                    <div>
+                        <label>⏱ 訓練輪數 (epochs)</label>
+                        <input type="number" id="epochs" value="50" min="1" max="500" />
+                    </div>
+                    <div>
+                        <label>📦 批次大小 (batch)</label>
+                        <input type="number" id="batchSize" value="32" min="8" max="512" />
+                    </div>
+                    <div>
+                        <label>📉 學習率 (learning rate)</label>
+                        <input type="number" id="lr" value="0.01" step="0.001" />
+                        <label>📉 學習率策略</label>
+                        <select id="lrSchedule">
+                            <option value="constant">固定學習率 (Constant)</option>
+                            <option value="step_decay">階梯衰減 (Step Decay)</option>
+                            <option value="exp_decay">指數衰減 (Exponential Decay)</option>
+                            <option value="cosine_decay">餘弦衰減 (Cosine Decay)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>📏 訓練比例</label>
+                        <input type="number" id="trainRatio" value="0.8" step="0.05" min="0.5" max="0.95" />
+                    </div>
+                </div>
+                <!-- 放在訓練模型設定卡片的後面，同一個 .row 裡 -->
+                <div id="mlParams" class="card hidden" style="margin-left:12px; min-width:320px;">
+                    <h3>🔧 傳統 ML 參數</h3>
+
+                    <!-- Tree -->
+                    <div id="params_tree" class="hidden">
+                        <label>最大樹深度 (max_depth)</label>
+                        <input type="number" id="maxDepth" value="6" min="1" max="100" />
+                        <label style="margin-top:8px;">最小分裂樣本數 (min_samples_split)</label>
+                        <input type="number" id="minSamplesSplit" value="2" min="2" />
+                    </div>
+
+                    <!-- Random Forest -->
+                    <div id="params_rf" class="hidden">
+                        <label>最大樹深度 (max_depth)</label>
+                        <input type="number" id="maxDepth" value="6" min="1" max="100" />
+                        <label style="margin-top:8px;">最小分裂樣本數 (min_samples_split)</label>
+                        <input type="number" id="minSamplesSplit" value="2" min="2" />
+                        <label style="margin-top:8px;">樹的數量 (n_estimators)</label>
+                        <input type="number" id="nEstimators" value="100" min="1" />
+                    </div>
+
+                    <!-- KNN -->
+                    <div id="params_knn" class="hidden">
+                        <label>鄰居數 (k)</label>
+                        <input type="number" id="knnK" value="5" min="1" />
+                        <label style="margin-top:8px;">權重 (weights)</label>
+                        <select id="knnWeights">
+                            <option value="uniform">uniform</option>
+                            <option value="distance">distance</option>
+                        </select>
+                        <label style="margin-top:8px;">距離 (metric)</label>
+                        <select id="knnMetric">
+                            <option value="euclidean">euclidean</option>
+                            <option value="manhattan">manhattan</option>
+                            <option value="minkowski">minkowski</option>
+                        </select>
+                        <div id="knnPWrap" style="margin-top:8px;">
+                            <label>Minkowski p</label>
+                            <input type="number" id="knnP" value="2" min="1" step="1" />
+                        </div>
+                    </div>
+
+                    <!-- SVM -->
+                    <div id="params_svm" class="hidden">
+                        <label>懲罰係數 (C)</label>
+                        <input type="number" id="svmC" value="1" min="0.0001" step="0.1" />
+                        <label style="margin-top:8px;">核函數 (kernel)</label>
+                        <select id="svmKernel">
+                            <option value="rbf">rbf</option>
+                            <option value="linear">linear</option>
+                            <option value="poly">poly</option>
+                            <option value="sigmoid">sigmoid</option>
+                        </select>
+                        <label style="margin-top:8px;">γ (gamma)</label>
+                        <select id="svmGamma">
+                            <option value="scale">scale</option>
+                            <option value="auto">auto</option>
+                        </select>
+                    </div>
+
+                    <!-- Naive Bayes -->
+                    <div id="params_nb" class="hidden">
+                        <label>平滑參數 (alpha)</label>
+                        <input type="number" id="nbAlpha" value="1.0" min="0" step="0.1" />
+                    </div>
+
+                    <div class="muted" style="margin-top:10px;">
+                        ※ 只有在「🎛️ 選擇內建模型」且選到傳統 ML 模型時顯示本區。
+                    </div>
+                </div>
+
+
+                <div style="margin-top:12px;">
+                    <label><input type="checkbox" id="normalize" checked /> 📏 MinMax 正規化（取消則用 Z-score）</label>
+                </div>
+            </div>
         </div>
-  
-        <!-- B. 內建模型卡片容器（預設隱藏；JS 會塞卡片進來） -->
-        <div id="presetModels" class="model-grid hidden" style="margin-top:8px;"></div>
-  
-        <!-- ✅ 自訂層容器（預設隱藏；custom 模式才顯示） -->
-        <div id="customLayersContainer" style="display:none; margin-top:12px;">
-          <h4>📐 自訂層設定</h4>
-          <div style="margin-bottom:8px;">
-            <label for="layerTypeSelect">選擇層類型：</label>
-            <select id="layerTypeSelect">
-              <option value="dense">Dense（全連接層）</option>
-              <option value="dropout">Dropout（隨機失活）</option>
-              <option value="batchnorm">BatchNorm（批次正規化）</option>
-              <option value="activation">Activation（激活函數）</option>
-              <option value="flatten">Flatten（展平）</option>
-            </select>
-            <button type="button" onclick="addLayerFromUI()">➕ 新增層</button>
-          </div>
-          <!-- 🧱 層列表 -->
-          <div id="layerList"></div>
-        </div>
-  
-        <!-- 超參數區塊 -->
-        <div class="row" style="margin-top:10px;">
-          <div>
-            <label>⏱ 訓練輪數 (epochs)</label>
-            <input type="number" id="epochs" value="50" min="1" max="500" />
-          </div>
-          <div>
-            <label>📦 批次大小 (batch)</label>
-            <input type="number" id="batchSize" value="32" min="8" max="512" />
-          </div>
-          <div>
-            <label>📉 學習率 (learning rate)</label>
-            <input type="number" id="lr" value="0.01" step="0.001"/>
-            <label>📉 學習率策略</label>
-            <select id="lrSchedule">
-              <option value="constant">固定學習率 (Constant)</option>
-              <option value="step_decay">階梯衰減 (Step Decay)</option>
-              <option value="exp_decay">指數衰減 (Exponential Decay)</option>
-              <option value="cosine_decay">餘弦衰減 (Cosine Decay)</option>
-            </select>
-          </div>
-          <div>
-            <label>📏 訓練比例</label>
-            <input type="number" id="trainRatio" value="0.8" step="0.05" min="0.5" max="0.95" />
-          </div>
-        </div>
-        <!-- 放在訓練模型設定卡片的後面，同一個 .row 裡 -->
-<div id="mlParams" class="card hidden" style="margin-left:12px; min-width:320px;">
-    <h3>🔧 傳統 ML 參數</h3>
-  
-    <!-- Tree -->
-    <div id="params_tree" class="hidden">
-      <label>最大樹深度 (max_depth)</label>
-      <input type="number" id="maxDepth" value="6" min="1" max="100" />
-      <label style="margin-top:8px;">最小分裂樣本數 (min_samples_split)</label>
-      <input type="number" id="minSamplesSplit" value="2" min="2" />
-    </div>
-  
-    <!-- Random Forest -->
-    <div id="params_rf" class="hidden">
-      <label>最大樹深度 (max_depth)</label>
-      <input type="number" id="maxDepth" value="6" min="1" max="100" />
-      <label style="margin-top:8px;">最小分裂樣本數 (min_samples_split)</label>
-      <input type="number" id="minSamplesSplit" value="2" min="2" />
-      <label style="margin-top:8px;">樹的數量 (n_estimators)</label>
-      <input type="number" id="nEstimators" value="100" min="1" />
-    </div>
-  
-    <!-- KNN -->
-    <div id="params_knn" class="hidden">
-      <label>鄰居數 (k)</label>
-      <input type="number" id="knnK" value="5" min="1" />
-      <label style="margin-top:8px;">權重 (weights)</label>
-      <select id="knnWeights">
-        <option value="uniform">uniform</option>
-        <option value="distance">distance</option>
-      </select>
-      <label style="margin-top:8px;">距離 (metric)</label>
-      <select id="knnMetric">
-        <option value="euclidean">euclidean</option>
-        <option value="manhattan">manhattan</option>
-        <option value="minkowski">minkowski</option>
-      </select>
-      <div id="knnPWrap" style="margin-top:8px;">
-        <label>Minkowski p</label>
-        <input type="number" id="knnP" value="2" min="1" step="1" />
-      </div>
-    </div>
-  
-    <!-- SVM -->
-    <div id="params_svm" class="hidden">
-      <label>懲罰係數 (C)</label>
-      <input type="number" id="svmC" value="1" min="0.0001" step="0.1" />
-      <label style="margin-top:8px;">核函數 (kernel)</label>
-      <select id="svmKernel">
-        <option value="rbf">rbf</option>
-        <option value="linear">linear</option>
-        <option value="poly">poly</option>
-        <option value="sigmoid">sigmoid</option>
-      </select>
-      <label style="margin-top:8px;">γ (gamma)</label>
-      <select id="svmGamma">
-        <option value="scale">scale</option>
-        <option value="auto">auto</option>
-      </select>
-    </div>
-  
-    <!-- Naive Bayes -->
-    <div id="params_nb" class="hidden">
-      <label>平滑參數 (alpha)</label>
-      <input type="number" id="nbAlpha" value="1.0" min="0" step="0.1" />
-    </div>
-  
-    <div class="muted" style="margin-top:10px;">
-      ※ 只有在「🎛️ 選擇內建模型」且選到傳統 ML 模型時顯示本區。
-    </div>
-  </div>
-  
-  
-        <div style="margin-top:12px;">
-          <label><input type="checkbox" id="normalize" checked /> 📏 MinMax 正規化（取消則用 Z-score）</label>
-        </div>
-      </div>
-    </div>
-  
-    <!-- ⤵️ 底部收合：載入既有 TF.js 模型 -->
-    <details class="collapsible-card" style="margin-top:16px;">
-      <summary style="cursor:pointer; font-weight:600;">
-        📂 載入既有 TF.js 模型 <span class="muted" style="font-weight:400;">（點此展開/收合）</span>
-      </summary>
-      <div class="card" style="margin-top:8px;">
-        <button id="resetModelBtn" style="margin-top:8px;background:#e74c3c;">🧹 載入前清空目前模型</button>
-        <h3>📥 載入既有 TF.js 模型</h3>
-  
-        <label>📄 模型結構（model.json）</label>
-        <input type="file" id="modelJson" accept=".json">
-  
-        <label>💾 權重檔（.bin）</label>
-        <input type="file" id="modelBin" accept=".bin">
-  
-        <label>⚙️ 前處理設定（metadata.json）</label>
-        <input type="file" id="metaJson" accept=".json">
-  
-        <button id="loadModelBtn" style="margin-top:8px;">📂 載入模型與設定</button>
-        <div id="loadStatus" class="muted"></div>
-      </div>
-    </details>
-  </section>
-  
+
+        <!-- ⤵️ 底部收合：載入既有 TF.js 模型 -->
+        <details class="collapsible-card" style="margin-top:16px;">
+            <summary style="cursor:pointer; font-weight:600;">
+                📂 載入既有 TF.js 模型 <span class="muted" style="font-weight:400;">（點此展開/收合）</span>
+            </summary>
+            <div class="card" style="margin-top:8px;">
+                <button id="resetModelBtn" style="margin-top:8px;background:#e74c3c;">🧹 載入前清空目前模型</button>
+                <h3>📥 載入既有 TF.js 模型</h3>
+
+                <label>📄 模型結構（model.json）</label>
+                <input type="file" id="modelJson" accept=".json">
+
+                <label>💾 權重檔（.bin）</label>
+                <input type="file" id="modelBin" accept=".bin">
+
+                <label>⚙️ 前處理設定（metadata.json）</label>
+                <input type="file" id="metaJson" accept=".json">
+
+                <button id="loadModelBtn" style="margin-top:8px;">📂 載入模型與設定</button>
+                <div id="loadStatus" class="muted"></div>
+            </div>
+        </details>
+    </section>
+
     <!-- 3) 訓練 -->
     <section id="tab-train" class="hidden">
         <div class="row">
@@ -325,171 +325,443 @@
     </section>
     <section id="tab-glossary" class="hidden">
         <div class="card" style="padding:16px; line-height:1.65;">
-            <h2>📚 機器學習說明與名詞解釋</h2>
-            <p class="muted">這一頁用白話解釋：為什麼要訓練模型、怎麼設定、每個名詞代表什麼，以及如何正確解讀結果。</p>
+            <h2>📚 機器學習新手指南（本系統怎麼用）</h2>
+            <p class="muted">用白話解釋你在這個工具裡會做什麼、每個名詞是什麼意思，以及結果要怎麼正確看懂。</p>
 
-            <!-- 一、為什麼要訓練模型 -->
+            <!-- 1. 為什麼要訓練模型 -->
             <details open>
-                <summary><strong>一、為什麼要訓練模型？（目的與意義）</strong></summary>
+                <summary><strong>一、為什麼要訓練模型？</strong></summary>
                 <ul>
-                    <li><b>目的：</b>用既有資料（特徵 ➜ 目標）學出「規則」，以便在未來對看不到標籤的新資料做<strong>預測</strong>或<strong>判斷</strong>。</li>
-                    <li><b>關鍵：</b>學到的規則不只在訓練資料上有效，還能對沒看過的資料也表現穩定，稱為<strong>泛化能力</strong>。</li>
-                    <li><b>流程：</b>載入資料 → 指定目標欄位與特徵 → 前處理（正規化、類別編碼）→ 選模型與超參數 → 訓練與驗證 → 評估 → 下載模型＋前處理設定 → 預測。</li>
+                    <li><b>目標：</b>用過去資料學出「規則」，拿去預測未來資料的結果。</li>
+                    <li><b>重點：</b>不只在舊資料準，對<b>沒看過</b>的新資料也要穩，這叫「<b>泛化</b>」。</li>
+                    <li><b>流程：</b>上傳 CSV → 選目標欄位(Y) 與特徵(X) → 前處理（縮放/編碼）→ 選模型與超參數 → 訓練/驗證 → 評估與解讀 →
+                        下載模型＋<code>metadata.json</code> → 預測。</li>
                 </ul>
             </details>
 
-            <!-- 二、資料與前處理 -->
+            <!-- 2. 常見名詞 -->
             <details>
-                <summary><strong>二、資料與前處理（Features, Labels, Normalization, One-Hot）</strong></summary>
+                <summary><strong>二、常見名詞（超白話）</strong></summary>
                 <dl>
-                    <dt><b>Feature（特徵）</b></dt>
-                    <dd>模型的輸入欄位。預測時會依 <code>metadata.json</code> 的 <code>featureCols</code> 自動擷取，不需重選。</dd>
-
-                    <dt><b>Label / Target（標籤 / 目標）</b></dt>
-                    <dd>要被預測的輸出欄位（分類＝類別；回歸＝連續數值）。</dd>
-
-                    <dt><b>Normalization（正規化）</b></dt>
-                    <dd>將數值特徵帶到相近尺度，避免某些欄位主導訓練。<br>
-                        - <b>MinMax</b>：x' = (x − min) / (max − min) → 範圍 [0,1]<br>
-                        - <b>Z-score</b>：x' = (x − mean) / std → 均值 0、標準差 1<br>
-                        參數會保存到 <code>metadata.json</code>（<code>numStats</code>）。</dd>
-
-                    <dt><b>One-Hot Encoding</b></dt>
-                    <dd>類別欄位轉成 0/1 多欄位向量。對應表存於 <code>metadata.json</code> 的 <code>catMaps</code>。</dd>
-
-                    <dt><b>Train / Validation / Test</b></dt>
-                    <dd>訓練集學參數；驗證集監控泛化並調參；測試集作最終成績。頁面用 <b>訓練比例</b>切分（例如 0.8 → 8:2）。</dd>
-                </dl>
-            </details>
-
-            <!-- 三、任務與模型 -->
-            <details>
-                <summary><strong>三、任務與模型（TF.js 與 ML-bundle 模型家族）</strong></summary>
-
-                <h4>任務類型（Task Type）</h4>
-                <ul>
-                    <li><b>分類（Classification）</b>：預測離散類別（例：是否流失、商品類別）。</li>
-                    <li><b>回歸（Regression）</b>：預測連續數值（例：價格、需求量）。</li>
-                </ul>
-
-                <h4>🔥 TensorFlow.js 模型</h4>
-                <ul>
-                    <li><b>Linear Regression</b>（回歸）：線性關係、可解釋。</li>
-                    <li><b>Logistic Regression</b>（分類）：輸出機率，二元／多類皆可。</li>
-                    <li><b>MLP / Deep MLP</b>（分類/回歸）：多層感知機，擬合非線性；Deep 版本層數更多、需正則化。</li>
-                    <li><b>MLP + BatchNorm</b>：在 MLP 中加入批次正規化，訓練更穩定。</li>
-                    <li><b>Wide & Deep</b>：結合線性（記憶）與深度特徵（泛化），常見於推薦與表格資料。</li>
-                    <li><b>TabNet-like（簡化）</b>：表格資料友善的結構，可學到特徵權重與選擇。</li>
-                    <li><b>Polynomial Regression</b>（回歸）：用較淺層 MLP 近似多項式關係。</li>
-                </ul>
-
-                <h4>⚡ ML-bundle.js 模型</h4>
-                <ul>
-                    <li><b>Decision Tree</b>（分類/回歸）：規則清楚、易解釋；單樹易過擬合。</li>
-                    <li><b>Random Forest</b>（分類/回歸）：多樹集成，穩定且抗過擬合。</li>
-                    <li><b>KNN</b>（分類/回歸）：基於距離的記憶式方法；資料大時預測較慢。</li>
-                    <li><b>SVM</b>（分類/回歸）：高維邊界學習，對中小型資料表現佳。</li>
-                    <li><b>Naive Bayes</b>（分類）：簡潔快速，文本常用（條件獨立假設）。</li>
-                </ul>
-            </details>
-
-            <!-- 四、可調參數（對應你的設定面板） -->
-            <details>
-                <summary><strong>四、訓練設定（對應你的面板：Epochs / Batch / LR / 比例 / 正規化）</strong></summary>
-                <dl>
-                    <dt><b>Epochs（訓練輪數）</b></dt>
-                    <dd>模型完整看過訓練資料的次數。太少會欠擬合，太多易過擬合。</dd>
-
-                    <dt><b>Batch Size（批次大小）</b></dt>
-                    <dd>每次更新使用的樣本數。小批次（如 32）較穩定但慢；大批次（如 256）較快但可能影響泛化。</dd>
-
+                    <dt><b>特徵（Features）</b></dt>
+                    <dd>模型的輸入欄位，例如年齡、金額、地區。</dd>
+                    <dt><b>目標（Target/Label）</b></dt>
+                    <dd>要預測的欄位：分類＝類別（0/1/2…），回歸＝連續數值。</dd>
+                    <dt><b>Epoch / Batch</b></dt>
+                    <dd>Epoch：整個訓練資料看一輪。Batch：每次更新用幾筆（例如 32）。</dd>
                     <dt><b>Learning Rate（學習率）</b></dt>
-                    <dd>
-                        步伐大小；太大易震盪，太小收斂慢。
-                        <b>調整策略（Learning Rate Schedule）</b>：
-                        <ul>
-                            <li><b>Constant（固定）</b>：整個訓練過程學習率不變。</li>
-                            <li><b>Step Decay（階梯式衰減）</b>：每隔固定 Epoch（例如 10 次）將學習率乘以一個比例（如 0.5）。</li>
-                            <li><b>Exponential Decay（指數衰減）</b>：每個 Epoch 按固定比率遞減（平滑下降）。</li>
-                            <li><b>Cosine Annealing（餘弦退火）</b>：學習率隨 Epoch 呈波浪式下降，可在訓練中後期保持微調能力。</li>
-                        </ul>
-                        通常建議搭配 <b>Early Stopping</b>，在驗證集表現不再提升時提早結束訓練。
-                    </dd>
-
-                    <dt><b>Train Ratio（訓練比例）</b></dt>
-                    <dd>例如 0.8＝80% 訓練、20% 驗證。資料量小可設高一些（0.8~0.9），資料量大則可拉低（0.6~0.8）。</dd>
-
-                    <dt><b>Normalization（正規化）</b></dt>
-                    <dd>預設 MinMax；取消勾選則改用 Z-score。前處理參數會儲存在 <code>metadata.json</code>，預測時必須套用相同規則。</dd>
-
-                    <dt><b>Regularization（正則化）</b></dt>
-                    <dd>常見方式：<b>Dropout</b>（隨機遮蔽神經元）、<b>L2</b> 權重衰減、<b>Early Stopping</b>（驗證集無改善即停止）。</dd>
+                    <dd>每次調整的步伐大小。太大會晃、太小會慢。</dd>
+                    <dt><b>Loss（損失）</b></dt>
+                    <dd>「現在錯多少」的分數；越低越好。</dd>
                 </dl>
             </details>
 
-            <!-- 五、如何看成績 -->
+            <!-- 3. 資料與前處理 -->
             <details>
-                <summary><strong>五、如何解讀訓練與預測結果（Loss / 指標 / 圖表）</strong></summary>
-
-                <h4>Loss（損失）</h4>
+                <summary><strong>三、資料與前處理（做得好，模型就輕鬆）</strong></summary>
                 <ul>
-                    <li><b>Train Loss</b>：訓練集平均錯誤；越低越好，但過低且 Val Loss 偏高＝過擬合。</li>
-                    <li><b>Val Loss</b>：驗證集平均錯誤；觀察是否持續下降與是否與 Train Loss 分歧。</li>
-                    <li>分類常用交叉熵；回歸常用 MSE（均方誤差）。</li>
-                </ul>
-
-                <h4>分類指標（Classification）</h4>
-                <ul>
-                    <li><b>Accuracy</b>： (TP+TN)/(TP+TN+FP+FN)，類別平衡時好用。</li>
-                    <li><b>Precision</b>：TP/(TP+FP)；預測為正中有多少是真的。</li>
-                    <li><b>Recall</b>：TP/(TP+FN)；實際為正中抓到多少。</li>
-                    <li><b>F1</b>：Precision 與 Recall 的調和平均；類別不平衡時更可靠。</li>
-                    <li><b>Confusion Matrix</b>：真實 × 預測的次數表；對角線＝預測正確。</li>
-                    <li><b>ROC / AUROC</b>（二元分類）：以不同閾值計算 TPR/FPR；AUC 介於 0.5（隨機）～1（完美）。</li>
-                </ul>
-
-                <h4>回歸指標（Regression）</h4>
-                <ul>
-                    <li><b>MSE</b>：均方誤差；對大誤差較敏感。</li>
-                    <li><b>MAE</b>：平均絕對誤差；直覺、抗極端值。</li>
-                    <li><b>R²</b>：解釋度（0~1），越接近 1 越好。</li>
-                </ul>
-            </details>
-
-            <!-- 六、預測與一致性 -->
-            <details>
-                <summary><strong>六、預測流程與「特徵一致性」</strong></summary>
-                <ul>
-                    <li>預測時<b>不需</b>再手動選特徵；系統依 <code>metadata.json</code> 的
-                        <code>featureCols / colTypes / catMaps / numStats</code> 自動處理。
+                    <li><b>數值縮放</b>：預設 <b>MinMax</b>（到 0~1）。取消勾選則用 <b>Z-score</b>（均值0、標準差1）。避免某欄「聲量太大」主導訓練。</li>
+                    <li><b>類別編碼</b>：文字類別自動變成 One-Hot（例如「男/女」→ 兩個 0/1 欄）。</li>
+                    <li><b>缺值</b>：目前不自動補值。請在上傳前處理或把無效值改為空白/NA。</li>
+                    <li><b>metadata.json</b> 會存什麼？
+                        <ul>
+                            <li><code>featureCols</code>（用到哪些欄）</li>
+                            <li><code>colTypes</code>（每欄是數值/類別）</li>
+                            <li><code>numStats</code>（Min/Max 或 Mean/Std）</li>
+                            <li><code>catMaps</code>（類別到索引的對照）</li>
+                            <li><code>task</code>、<code>normalize</code>、<code>labelInfo</code> 等</li>
+                        </ul>
+                        <b>預測時一定要帶同一份</b>，才能做一模一樣的前處理。
                     </li>
-                    <li>如果預測檔<b>缺少</b>訓練用特徵 → 會報錯；多出的欄位會被忽略。</li>
-                    <li>若使用<b>載入模型</b>，請同時載入配套的 <code>metadata.json</code>，確保前處理一致。</li>
                 </ul>
             </details>
 
-            <!-- 七、常見疑難排解 -->
+            <!-- 4. 特徵選擇與關係係數 -->
             <details>
-                <summary><strong>七、常見問題（FAQ / Debug）</strong></summary>
+                <summary><strong>四、怎麼挑特徵？（這裡的關係係數在說什麼）</strong></summary>
                 <ul>
-                    <li><b>圖表未更新</b>：重新訓練或載入前先清除舊圖（本系統已於繪圖前自動 <code>destroy()</code> 舊實例）。</li>
-                    <li><b>載入 TF.js 失敗</b>：請同時選擇 <code>model.json</code> 與對應 <code>.bin</code> 權重檔。</li>
-                    <li><b>JSON 解析錯誤</b>：請確認 <code>metadata.json</code> 不是以 CSV / 二進位誤存。</li>
-                    <li><b>predict() 為 null</b>：尚未訓練或載入模型；請先完成訓練或載入已儲存模型＋metadata。</li>
+                    <li><b>Pearson r</b>（數值↔數值）：看線性關係，介於 -1~1。例：身高 vs 體重。</li>
+                    <li><b>η（Eta, 變異數比）</b>（類別↔數值）：各類別的平均差多少。例：地區 vs 平均客單價。</li>
+                    <li><b>Cramér’s V</b>（類別↔類別）：兩個類別字段關不關聯。例：裝置類型 vs 是否轉換。</li>
+                    <li>係數不是「因果」，只是「<b>可能有關</b>」。實際是否好用，還要看驗證分數。</li>
                 </ul>
             </details>
 
-            <!-- 八、實務建議 -->
+            <!-- 5. 任務與模型（TF.js） -->
             <details>
-                <summary><strong>八、實務建議（新手也適用）</strong></summary>
+                <summary><strong>五、內建深度模型（TensorFlow.js）</strong></summary>
                 <ul>
-                    <li>先用較簡單模型（Logistic/Linear、淺層 MLP）建立基準，再嘗試 Deep MLP / Wide&Deep。</li>
-                    <li>觀察 <b>Train vs Val Loss</b> 間距：差距擴大＝過擬合，請加強正則化或早停。</li>
-                    <li>類別不平衡時，請重點看 <b>Recall / Precision / F1</b>，別只看 Accuracy。</li>
-                    <li>下載並保存 <b>模型</b> 與 <b>metadata.json</b>，預測時兩者需<strong>配對使用</strong>。</li>
+                    <li><b>Linear / Logistic</b>：最基本、最易解釋。線性關係或做基準用。</li>
+                    <li><b>MLP / Deep MLP</b>：處理一般表格的萬用款；Deep 版本層多更會擬合，記得加 Dropout 或 L2。</li>
+                    <li><b>MLP + BatchNorm</b>：訓練更穩，收斂更順。</li>
+                    <li><b>Wide & Deep</b>：線性（記記憶）＋非線性（學泛化）混搭。</li>
+                    <li><b>TabNet-like（簡化）</b>：對表格友善，能學出特徵權重（可輔助解釋）。</li>
+                    <li><b>Polynomial Regression</b>：近似非線性回歸的入門款。</li>
+                    <li><b>RNN / LSTM</b>：做序列/時間序列時再用。</li>
                 </ul>
             </details>
-        </div>
+
+            <!-- 6. 傳統 ML 與超參數 -->
+            <details>
+                <summary><strong>六、傳統 ML（ML-bundle）與常見參數</strong></summary>
+                <ul>
+                    <li><b>Decision Tree</b>：像一堆 if-else。<b>max_depth</b> 越大越會記住訓練資料（可能過擬合）。</li>
+                    <li><b>Random Forest</b>：很多小樹投票。<b>n_estimators</b> 越多越穩但較慢；<b>max_depth</b> 控制複雜度。</li>
+                    <li><b>KNN</b>：看最近的 K 個鄰居。<b>k</b> 太小會吵、太大會鈍；建議搭配正規化。</li>
+                    <li><b>SVM</b>：找出分界線/面。<b>C</b> 越大越重視訓練錯誤（可能過擬合）；kernel 可選 <i>linear / rbf / poly</i>。</li>
+                    <li><b>Naive Bayes</b>：超快、常用在文字。<b>alpha</b> 是平滑參數。</li>
+                </ul>
+            </details>
+            <!-- 深度模型 vs 傳統機器學習：概念、原理、差異、選用指南 -->
+            <details>
+                <summary><strong>附錄：深度模型（Deep Learning）跟傳統機器學習有什麼不一樣？</strong></summary>
+
+                <h4>1 先說結論（白話速讀）</h4>
+                <ul>
+                    <li><b>傳統機器學習</b>：像是「聰明的統計方法」──你提供好用的特徵，它做清楚的規則或距離判斷（例如 Logistic、SVM、KNN、決策樹/隨機森林）。</li>
+                    <li><b>深度模型（MLP/Deep MLP 等）</b>：像是「自己會組合特徵的堆積木」──透過多層非線性，把原始欄位組成更有用的表徵（representation）。</li>
+                    <li><b>關鍵差異</b>：<u>誰來做特徵工程？</u> 傳統法多半靠人類；深度法試著自己學出來。</li>
+                </ul>
+
+                <h4>2 深度模型在做什麼？（原理簡介）</h4>
+                <ul>
+                    <li><b>多層非線性</b>：每層 Dense 都在做「加權→激活」；疊很多層＝可以表示非常複雜的函數（Universal Approximation）。</li>
+                    <li><b>反向傳播（Backpropagation）</b>：算出每個權重對 Loss 的影響，沿著梯度微調（SGD/Adam），一次次把錯誤壓低。</li>
+                    <li><b>表徵學習（Representation Learning）</b>：網路自己把「原始欄位」混合成更有區分力的特徵，不需要手工做太多轉換（但乾淨資料與適度縮放仍很重要）。</li>
+                    <li><b>正則化與穩定技巧</b>：Dropout、L2、BatchNorm、學習率排程…讓訓練更穩、減少過擬合。</li>
+                </ul>
+
+                <h4>3 那傳統方法在做什麼？（直覺與優勢）</h4>
+                <ul>
+                    <li><b>線性/對數線性模型（Linear/Logistic）</b>：清楚、可解釋、速度快；適合先做基準或需要報告清楚理由的場景。</li>
+                    <li><b>決策樹 / 隨機森林</b>：類似很多 if-else 的組合；容易解釋、對表格資料很強韌；中小資料常見表現很好。</li>
+                    <li><b>KNN / SVM</b>：分別是「看鄰居」與「找最佳分界」的思路；對小中型資料集常有漂亮成績。</li>
+                </ul>
+
+                <h4>4 兩派最大的差異</h4>
+                <ul>
+                    <li><b>特徵工程</b>：傳統法仰賴人工特徵；深度法可以「自己學」。</li>
+                    <li><b>資料需求</b>：深度法較吃資料與算力；資料少時傳統法常更穩、更快。</li>
+                    <li><b>可解釋性</b>：傳統法（特別是 Linear/Tree）較容易解釋；深度法需靠特徵重要性、PDP/ICE 等輔助。</li>
+                    <li><b>表格資料的現實</b>：很多時候樹系集成（如森林/梯度提升）是強 baseline；深度網路要在表格上贏過它，通常需要更多資料或好的特徵嵌入設計。</li>
+                </ul>
+
+                <h4>5 什麼時候選哪種？（選用指南）</h4>
+                <ul>
+                    <li><b>我要可解釋、快速交付</b>：先上 Linear/Logistic 或 Decision Tree；再用 Random Forest 作穩定強化。</li>
+                    <li><b>資料不多（幾千～幾萬列）</b>：傳統法優先（Logistic、SVM、森林、KNN）。</li>
+                    <li><b>欄位很多、關係很非線性</b>：MLP/Deep MLP 值得一試，搭配正則化與良好縮放。</li>
+                    <li><b>需要「自動學特徵」或未來想擴到海量資料</b>：走深度路線（MLP→更深→特殊架構）。</li>
+                </ul>
+
+                <h4>6 為何 MLP 有時候「沒比森林好」？</h4>
+                <ul>
+                    <li><b>表格資料常見訊號微弱、雜訊大</b>：森林靠隨機子特徵/子樣本投票，自帶強正則、少調參就能穩定。</li>
+                    <li><b>MLP 需要良好縮放與適度深度</b>：沒縮放、層數/寬度不合或學習率不佳，容易學不動或過擬合。</li>
+                </ul>
+
+                <h4>7 在這套系統裡，怎麼落地這些差異？</h4>
+                <ul>
+                    <li><b>Auto 模式</b>：會同場競技模型，挑最好的；過程中即時釋放較差模型節省記憶體。</li>
+                    <li><b>可解釋性報告</b>：不管選到誰，最後都會產出重點：特徵重要性、混淆矩陣/ROC（分類）、誤差指標（回歸）。</li>
+                    <li><b>自訂層</b>：想體驗「讓模型自己學特徵」，用 MLP/Deep MLP，照建議順序 Dense→BN→Activation→Dropout 疊起來。</li>
+                </ul>
+
+                <h4>8 一句話小抄</h4>
+                <ul>
+                    <li><b>報告要理由、資料不大 → 傳統法</b>；<b>資料多、關係複雜、可接受較低可解釋 → 深度法</b>。</li>
+                    <li>先用 <b>Logistic/Linear/森林</b> 做基準；再用 <b>MLP/Deep MLP</b> 試圖跨越。</li>
+                </ul>
+            </details>
+
+            <!-- 7. Auto 模式 -->
+            <details>
+                <summary><strong>七、Auto 模式在做什麼？</strong></summary>
+                <ul>
+                    <li>會依任務從一組候選模型中逐一訓練，<b>用驗證分數挑最高（分類=Accuracy / 回歸=Val Loss 最低）</b>。</li>
+                    <li>為了省記憶體，當前不是最好的模型會立刻釋放（dispose）。</li>
+                    <li>小提醒：分數不代表「可解釋性」。若報告需要可解釋，建議也嘗試 Logistic / Tree / Linear 等簡潔模型。</li>
+                </ul>
+            </details>
+
+            <!-- 8. 自訂模型（積木） -->
+            <details>
+                <summary><strong>八、自訂模型（像積木一樣拖拉）</strong></summary>
+                <ul>
+                    <li><b>Dense</b>：最常用的全連接層。<i>Units</i> 越多越能擬合但較易過擬合。</li>
+                    <li><b>Dropout</b>：訓練時隨機關掉部分神經元，防止過擬合。</li>
+                    <li><b>BatchNorm</b>：把每層輸出「拉回正常」，訓練更穩。</li>
+                    <li><b>Activation</b>：ReLU / Tanh / Sigmoid / Softmax（輸出層常用）。</li>
+                    <li><b>Flatten</b>：把多維展平（表格通常用不到）。</li>
+                    <li>系統會自動幫你接輸入/輸出頭，不必自己加。</li>
+                </ul>
+            </details>
+            <!-- Activation 函數（深入但白話） -->
+            <details>
+                <summary><strong>附錄：Activation（激活函數）到底在幹嘛？怎麼選？</strong></summary>
+
+                <p>Activation 就是把「線性加權」後的數值 <code>z = w·x + b</code>，經過一個非線性轉換 <code>f(z)</code>。沒有它，整個網路就只是「更大的線性回歸」。
+                </p>
+
+                <h4>常見激活（內層/輸出層都會看到）</h4>
+
+                <h5>① ReLU（Rectified Linear Unit）</h5>
+                <ul>
+                    <li><b>公式</b>：<code>f(z) = max(0, z)</code>；<b>範圍</b>：<code>[0, +∞)</code></li>
+                    <li><b>優點</b>：簡單、收斂快、梯度不容易消失（z&gt;0 區域梯度=1）。</li>
+                    <li><b>缺點</b>：<b>死 ReLU</b>（z 長期&lt;=0，梯度=0，神經元掛掉）。資料尺度差太多、學習率太大時更容易發生。</li>
+                    <li><b>何時用</b>：預設內層首選。搭配 BatchNorm、He 初始化效果更穩。</li>
+                </ul>
+
+                <h5>② Leaky ReLU / PReLU / ELU（ReLU 家族）</h5>
+                <ul>
+                    <li><b>Leaky ReLU</b>：<code>f(z)= z</code>（z&gt;0），<code>αz</code>（z≤0，α≈0.01）；可減少死 ReLU。</li>
+                    <li><b>PReLU</b>：α 可學習；更彈性但參數多。</li>
+                    <li><b>ELU</b>：負側是平滑的指數曲線；訓練更穩，但比 ReLU 慢一點。</li>
+                    <li><b>何時用</b>：ReLU 容易死掉或訓練不穩時，改 Leaky ReLU 很常見。</li>
+                </ul>
+
+                <h5>③ Tanh（雙曲正切）</h5>
+                <ul>
+                    <li><b>公式</b>：<code>f(z) = (e^z - e^{-z}) / (e^z + e^{-z})</code>；<b>範圍</b>：<code>[-1, 1]</code>
+                    </li>
+                    <li><b>優點</b>：輸出居中（均值接近 0），對某些任務較穩。</li>
+                    <li><b>缺點</b>：大正/負值會<b>飽和</b>（梯度→0），深層網路容易梯度消失；比 ReLU 慢。</li>
+                    <li><b>何時用</b>：需要輸出在 -1~1（例如做有界回歸再縮放回原尺度）；RNN/LSTM 傳統常見。</li>
+                </ul>
+
+                <h5>④ Sigmoid</h5>
+                <ul>
+                    <li><b>公式</b>：<code>σ(z)=1/(1+e^{-z})</code>；<b>範圍</b>：<code>(0,1)</code></li>
+                    <li><b>優點</b>：可視為機率；直覺。</li>
+                    <li><b>缺點</b>：容易飽和（|z|大→梯度≈0）；內層用它訓練會變慢。</li>
+                    <li><b>何時用</b>：<b>輸出層</b>的<b>二元分類</b>或<b>多標籤分類</b>（每類別各一個 sigmoid）。</li>
+                </ul>
+
+                <h5>⑤ Softmax</h5>
+                <ul>
+                    <li><b>公式</b>：<code>softmax_i(z)=exp(z_i)/Σ_j exp(z_j)</code>；<b>範圍</b>：每一類 0~1，合計=1</li>
+                    <li><b>優點</b>：把多類 logits 轉成一組機率；最常見的多分類輸出。</li>
+                    <li><b>注意</b>：實作上多用「<b>logits + cross-entropy</b>」的數值穩定版本（框架已處理）。</li>
+                    <li><b>何時用</b>：<b>輸出層</b>的<b>多類別單選</b>（mutually exclusive）。</li>
+                </ul>
+
+                <h5>⑥ Swish / SiLU、GELU、Softplus（更平滑的替代）</h5>
+                <ul>
+                    <li><b>Swish/SiLU</b>：<code>z · sigmoid(z)</code>；連續可導，效果常優於 ReLU（Transformer 常見 SiLU）。</li>
+                    <li><b>GELU</b>：高斯門控，現代 NLP / CV 模型常見。</li>
+                    <li><b>Softplus</b>：平滑版 ReLU（<code>log(1+e^z)</code>）。</li>
+                    <li><b>何時用</b>：想要更平滑、梯度更友善的內層，且能接受一點計算成本。</li>
+                </ul>
+
+                <h5>⑦ Linear（不使用激活）</h5>
+                <ul>
+                    <li><b>公式</b>：<code>f(z)=z</code></li>
+                    <li><b>用途</b>：<b>回歸輸出層</b>。若目標值沒有明確上下界，直接用 Linear；有界回歸可用 Tanh 再縮放。</li>
+                </ul>
+
+                <hr>
+
+                <h4>輸出層怎麼選（最常搞混的地方）</h4>
+                <ul>
+                    <li><b>二元分類（單標籤）</b>：<b>Sigmoid</b> + Binary Cross-Entropy（BCE）</li>
+                    <li><b>多類別單選</b>（互斥，如 A/B/C）：
+                        <b>Softmax</b> + Sparse/One-hot Cross-Entropy
+                    </li>
+                    <li><b>多標籤</b>（可同時屬於多個類，如「水果 & 紅色」）：
+                        每類別一個 <b>Sigmoid</b> + BCE（逐類加總）</li>
+                    <li><b>回歸</b>：<b>Linear</b> + MSE/MAE；若 y ∈ [a,b]，可用 <b>Tanh</b> 並線性縮放。</li>
+                </ul>
+
+                <h4>實務選用小抄</h4>
+                <ul>
+                    <li>內層預設 <b>ReLU</b>；如果常遇到「死 ReLU」或收斂不穩，換 <b>Leaky ReLU</b> 或 <b>SiLU</b>。</li>
+                    <li>搭 <b>BatchNorm</b> 可讓 ReLU/SiLU 更穩定；深網路記得加 <b>Dropout / L2</b>。</li>
+                    <li>初始化：ReLU 家族用 <b>He</b>，Tanh/Sigmoid 傳統會用 <b>Xavier/Glorot</b>（框架多數已內建合理預設）。</li>
+                    <li>數值穩定性：多分類用 <b>Softmax + （框架內建）Cross-Entropy</b> 的「logits 版」。</li>
+                    <li>校準機率：如果需要「更準的機率」而不只是排序，可考慮 <b>溫度縮放（temperature scaling）</b> 或校準法（後處理）。</li>
+                </ul>
+
+                <h4>常見雷區</h4>
+                <ul>
+                    <li><b>內層用 Sigmoid/Tanh 太多</b>：容易梯度消失、收斂慢。</li>
+                    <li><b>二元分類用 Softmax(2)</b>：可行但沒必要，<b>Sigmoid</b> + BCE 更簡單穩定。</li>
+                    <li><b>多標籤卻用了 Softmax</b>：會逼你只能選一類，應改「每類 Sigmoid」。</li>
+                    <li><b>回歸輸出用 Sigmoid</b>：會把輸出卡在 0~1，除非你有刻意做範圍縮放。</li>
+                </ul>
+            </details>
+            <!-- 自訂層怎麼疊？觀念 + 配方 -->
+            <details>
+                <summary><strong>附錄：自訂層通常怎麼疊？（觀念與方向）</strong></summary>
+
+                <p>在本系統中，你不需要自己加「輸入層 /
+                    輸出層」，只要專心設計中間的「特徵抽取幹路（backbone）」。一般表格問題（tabular）不需要太多層，重點是<strong>順序</strong>與<strong>正則化</strong>。
+                </p>
+
+                <h4>層的常見順序（推薦）</h4>
+                <ul>
+                    <li><b>Dense（不帶 activation）→ BatchNorm → Activation → Dropout</b></li>
+                    <li>如果不用 BatchNorm：<b>Dense（帶 ReLU）→ Dropout（可選）</b></li>
+                    <li>為什麼？BatchNorm 放在 Activation 前能讓分佈更穩定；Dropout 放在 Activation 後比較直覺。</li>
+                </ul>
+
+                <h4>幾個好用的「配方」</h4>
+                <ol>
+                    <li>
+                        <b>基準款（小資料/先摸底）</b><br>
+                        Dense(64) → ReLU → Dense(32) → ReLU → Output<br>
+                        <span class="muted">說明：先建立 baseline，確認資料可學到什麼程度；看 Val Loss/Acc 趨勢再決定要不要加深。</span>
+                    </li>
+                    <li>
+                        <b>穩定款（加 BatchNorm）</b><br>
+                        Dense(64, no act) → BN → ReLU → Dropout(0.1) → Dense(32, no act) → BN → ReLU → Output<br>
+                        <span class="muted">說明：BN 讓訓練更穩；微量 Dropout 抗過擬合。</span>
+                    </li>
+                    <li>
+                        <b>深一點（中等資料量）</b><br>
+                        Dense(128, no act) → BN → ReLU → Dropout(0.2) → Dense(64, no act) → BN → ReLU → Dense(32, no
+                        act) → ReLU → Output<br>
+                        <span class="muted">說明：寬→窄「漸進收斂」結構；層數 3~4 層通常已足夠。</span>
+                    </li>
+                    <li>
+                        <b>Wide & Deep（特徵多、關係複雜）</b><br>
+                        Dense(wide≈2×input_dim, linear) → Dense(128, no act) → BN → ReLU → Dense(64, no act) → ReLU →
+                        Output<br>
+                        <span class="muted">說明：「Wide」支援近似線性記憶；「Deep」負責非線性組合。</span>
+                    </li>
+                    <li>
+                        <b>序列/時間序列（有時間順序時）</b><br>
+                        Reshape([T, F]) → LSTM(32) → Dense(16, ReLU) → Output<br>
+                        <span class="muted">說明：只有在資料真的是序列時再用 RNN/LSTM；別對一般表格硬用。</span>
+                    </li>
+                </ol>
+
+                <h4>不同任務怎麼調</h4>
+                <ul>
+                    <li><b>分類（多類/二元）</b>：內層用 ReLU（或 Leaky ReLU / SiLU），<b>輸出層用</b>：
+                        <ul>
+                            <li>二元：<b>Sigmoid</b></li>
+                            <li>多類單選：<b>Softmax</b></li>
+                            <li>多標籤：每類一個 <b>Sigmoid</b></li>
+                        </ul>
+                    </li>
+                    <li><b>回歸</b>：輸出層 <b>Linear</b>；若目標有範圍（如 0~1），可用 Tanh 並把輸出再縮放回去。</li>
+                </ul>
+
+                <h4>寬度、層數怎麼抓？</h4>
+                <ul>
+                    <li><b>單層寬度</b>：常見 32~128；<b>初學者可用 64 起跳</b>。特徵很多就稍微加寬。</li>
+                    <li><b>層數</b>：2~4 層多半夠用；太深在表格資料常見過擬合且沒帶來收益。</li>
+                    <li><b>遞減式</b>：128 → 64 → 32 → …，比每層等寬更好收斂。</li>
+                </ul>
+
+                <h4>正則化的拿捏</h4>
+                <ul>
+                    <li><b>Dropout</b>：0.1~0.3 常見；資料少或層多時加大一點。</li>
+                    <li><b>L2</b>：配在 Dense（權重正則）；過擬合時加，0.0001~0.01 嘗試。</li>
+                    <li><b>BatchNorm</b>：讓訓練更穩，特別是學習率稍大的時候。</li>
+                </ul>
+
+                <h4>學習率與排程</h4>
+                <ul>
+                    <li><b>LR</b> 先用 1e-3；Loss 卡住可試 Step/Exp/Cosine 衰減。</li>
+                    <li>搭配 <b>Early Stopping</b>（你可以看 Val Loss 不再下降時手動停或降低 Epoch）。</li>
+                </ul>
+
+                <h4>避雷清單</h4>
+                <ul>
+                    <li>表格資料不用太深的網路；先求穩定可解釋，再求複雜。</li>
+                    <li>內層盡量用 ReLU/Leaky ReLU/SiLU，<b>不要整網路都用 Sigmoid/Tanh</b>，容易梯度消失。</li>
+                    <li>輸出層別用錯：二元=Sigmoid，多類=Softmax，回歸=Linear。</li>
+                    <li>只要加了 BatchNorm，就考慮把 Dense 的 activation 拿掉，改成「Dense(no act)→BN→Activation」。</li>
+                </ul>
+
+                <h4>怎麼判斷「夠了」？</h4>
+                <ul>
+                    <li>Val Loss/Acc 不再進步：先加正則（Dropout/L2），再考慮加深；再不行就調整特徵工程。</li>
+                    <li>Train 與 Val 差距越拉越大：過擬合 → 提高 Dropout、加 L2、降模型寬度/層數、或多拿資料。</li>
+                </ul>
+            </details>
+
+
+            <!-- 9. 訓練設定 -->
+            <details>
+                <summary><strong>九、訓練設定怎麼填？</strong></summary>
+                <ul>
+                    <li><b>Epochs</b>：先從 50 開始；看 Val Loss 是否還在降，必要時再加。</li>
+                    <li><b>Batch</b>：32 或 64 常見。資料很大可以調大；不穩就調小。</li>
+                    <li><b>Learning Rate</b>：0.001 是安全值；學不動就微加，震盪就微減。</li>
+                    <li><b>LR 策略</b>：若 Loss 卡住不降，用 Step/Exp/Cosine 讓學習率慢慢變小。</li>
+                    <li><b>Train Ratio</b>：資料少用 0.8~0.9，資料大可用 0.6~0.8。</li>
+                </ul>
+            </details>
+
+            <!-- 10. 評估與解讀 -->
+            <details>
+                <summary><strong>十、如何解讀結果？</strong></summary>
+                <h4>分類</h4>
+                <ul>
+                    <li><b>Accuracy</b>：整體正確率。類別不平衡時，請也看 Precision/Recall/F1。</li>
+                    <li><b>Confusion Matrix</b>：看錯在哪個類別（對角線越高越好）。</li>
+                    <li><b>ROC / AUC（二元）</b>：越靠左上越好，AUC 越接近 1 越理想。</li>
+                </ul>
+                <h4>回歸</h4>
+                <ul>
+                    <li><b>MSE / RMSE</b>：平均平方誤差及其平方根（單位與原值同）。</li>
+                    <li><b>MAE</b>：平均絕對誤差，對極端值比較不敏感。</li>
+                    <li><b>R²</b>：解釋度，0~1；越高越好。</li>
+                </ul>
+            </details>
+
+            <!-- 11. 可解釋性報告 -->
+            <details>
+                <summary><strong>十一、可解釋性（為什麼模型會這樣判斷？）</strong></summary>
+                <ul>
+                    <li><b>特徵重要性</b>：
+                        <ul>
+                            <li>樹/森林：內建的重要性（依分裂增益）。</li>
+                            <li>Permutation（PFI）：把某欄打亂，看分數掉多少。</li>
+                        </ul>
+                    </li>
+                    <li><b>PDP / ICE</b>：固定其他欄，只改一欄，看看預測怎麼變（單變數影響曲線）。</li>
+                    <li><b>錯誤分析</b>：把錯分樣本抓出來，看哪些區間/類別最容易出錯。</li>
+                    <li>小提醒：重要性≠因果；請搭配領域知識一起看。</li>
+                </ul>
+            </details>
+
+            <!-- 12. 匯出 / 匯入 -->
+            <details>
+                <summary><strong>十二、下載與載入</strong></summary>
+                <ul>
+                    <li><b>下載</b>：TF.js 會存下 <code>model.json</code> + <code>weights.bin</code>；另外下載
+                        <code>metadata.json</code>。
+                    </li>
+                    <li><b>載入</b>：三者要配對。若 <code>metadata.json</code> 結構不完整會拒絕載入。</li>
+                </ul>
+            </details>
+
+            <!-- 13. 實務眉角 -->
+            <details>
+                <summary><strong>十三、實務小撇步</strong></summary>
+                <ul>
+                    <li><b>避免資料外洩（Leakage）</b>：別把未來才會知道的欄位放進訓練。</li>
+                    <li><b>類別不平衡</b>：別只看 Accuracy；可調整閾值或改看 Recall/Precision/F1。</li>
+                    <li><b>重現性</b>：分資料會洗牌，結果每次可能略不同；要固定就設定隨機種子（未來版本提供）。</li>
+                </ul>
+            </details>
+
+            <!-- 14. 常見錯誤 -->
+            <details>
+                <summary><strong>十四、常見錯誤 & 快速排查</strong></summary>
+                <ul>
+                    <li><b>Container 'sequential_x' is already disposed</b>：上一個模型已釋放，卻還在用它的 Tensor。請確認每輪訓練後都有
+                        <code>dispose()</code>，或重整頁面。
+                    </li>
+                    <li><b>Invalid left-hand side in assignment</b>：用了 <code>obj?.prop = ...</code> 的語法；可選鏈結不能當左值。</li>
+                    <li><b>predict() 為 null</b>：尚未訓練/載入模型，或輸入維度和訓練時不一致。</li>
+                    <li><b>metadata 不符</b>：預測 CSV 的欄位/類別與訓練時不同；請重新導出或調整欄位。</li>
+                </ul>
+            </details>
         </div>
     </section>
 
