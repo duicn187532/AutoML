@@ -136,7 +136,7 @@
           </div>
           <div>
             <label>📉 學習率 (learning rate)</label>
-            <input type="number" id="lr" value="0.001" step="0.0001" min="0.00001" max="0.1" />
+            <input type="number" id="lr" value="0.01" step="0.001"/>
             <label>📉 學習率策略</label>
             <select id="lrSchedule">
               <option value="constant">固定學習率 (Constant)</option>
@@ -271,8 +271,6 @@
                         <div id="finalMetric">—</div>
                     </div>
                     <div class="metric">
-                        <pre id="autoLog"
-                            style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 8px; border: 1px solid #ccc;"></pre>
                         <div class="muted">最佳模型</div>
                         <div id="bestModelUsed">—</div>
                     </div>

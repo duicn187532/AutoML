@@ -12,63 +12,64 @@
    * 渲染：把 state -> DOM
    * -------------------------- */
   function layerRowTpl(L) {
-    // 共同外觀
-    const base = `
+    const wrapRow = (inner) => `
       <div class="drag-handle" title="拖曳排序">⠿</div>
-      <div class="layer-head">
-        <strong>${L.type.toUpperCase()}</strong>
-        <button class="btn-remove" data-action="remove" title="刪除">❌</button>
+      <div class="layer-content">
+        <strong class="layer-title">${L.type.toUpperCase()}</strong>
+        <div class="inline-controls">
+          ${inner}
+        </div>
       </div>
+      <button class="btn-remove" data-action="remove" title="刪除">❌</button>
     `;
-
-    // 各型別控制項（使用 data-key 事件委派，不用 inline handler）
+  
     if (L.type === 'dense') {
-      return `
-        ${base}
-        <div class="layer-body">
-          <label>Units
-            <input type="number" class="ctl" data-key="units" value="${L.units ?? 64}" min="1" step="1">
-          </label>
-          <label>Activation
-            <select class="ctl" data-key="activation">
-              ${['relu','tanh','sigmoid','linear'].map(a => `<option value="${a}" ${a === (L.activation || 'relu') ? 'selected':''}>${a}</option>`).join('')}
-            </select>
-          </label>
-        </div>
-      `;
+      return wrapRow(`
+        <label class="kv"><span>Units</span>
+          <input type="number" class="ctl sm" data-key="units" value="${L.units ?? 64}" min="1" step="1">
+        </label>
+        <label class="kv"><span>Activation</span>
+          <select class="ctl sm" data-key="activation">
+            ${['relu','tanh','sigmoid','linear'].map(a => `
+              <option value="${a}" ${a === (L.activation || 'relu') ? 'selected' : ''}>${a}</option>
+            `).join('')}
+          </select>
+        </label>
+      `);
     }
+  
     if (L.type === 'dropout') {
-      return `
-        ${base}
-        <div class="layer-body">
-          <label>Rate
-            <input type="number" class="ctl" data-key="rate" value="${L.rate ?? 0.3}" min="0" max="0.95" step="0.05">
-          </label>
-        </div>
-      `;
+      return wrapRow(`
+        <label class="kv"><span>Rate</span>
+          <input type="number" class="ctl sm" data-key="rate" value="${L.rate ?? 0.3}" min="0" max="0.95" step="0.05">
+        </label>
+      `);
     }
+  
     if (L.type === 'batchnorm') {
-      return `${base}<div class="layer-body muted">BatchNorm（無參數）</div>`;
+      return wrapRow(`<span class="muted mono">BatchNorm（無參數）</span>`);
     }
+  
     if (L.type === 'activation') {
-      return `
-        ${base}
-        <div class="layer-body">
-          <label>Function
-            <select class="ctl" data-key="activation">
-              ${['relu','tanh','sigmoid','softmax','linear'].map(a => `<option value="${a}" ${a === (L.activation || 'relu') ? 'selected':''}>${a}</option>`).join('')}
-            </select>
-          </label>
-        </div>
-      `;
+      return wrapRow(`
+        <label class="kv"><span>Function</span>
+          <select class="ctl sm" data-key="activation">
+            ${['relu','tanh','sigmoid','softmax','linear'].map(a => `
+              <option value="${a}" ${a === (L.activation || 'relu') ? 'selected' : ''}>${a}</option>
+            `).join('')}
+          </select>
+        </label>
+      `);
     }
+  
     if (L.type === 'flatten') {
-      return `${base}<div class="layer-body muted">Flatten（無參數）</div>`;
+      return wrapRow(`<span class="muted mono">Flatten（無參數）</span>`);
     }
-    // 未知類型（保底）
-    return `${base}<div class="layer-body muted">（未支援的層參數）</div>`;
+  
+    // fallback
+    return wrapRow(`<span class="muted mono">（未支援的層參數）</span>`);
   }
-
+  
   AML.renderCustomLayers = function () {
     const list = $('layerList');
     if (!list) return;
@@ -244,50 +245,171 @@
    * 模型卡 UI（維持你原有功能）
    * -------------------------- */
   AML.setupModelUI = function () {
+    const $ = (id) => document.getElementById(id);
     const modeGroup = $('modelModeGroup');
     const grid = $('presetModels');
     const customBox = $('customLayersContainer');
-
+  
+    // ==== 資料定義：更豐富的模型資訊 ====
     const TFJS = [
-      { v:'linear',   t:'Linear Regression', s:'回歸基準，線性關係', tags:['回歸','快速'] },
-      { v:'logistic', t:'Logistic Regression', s:'二元/多類分類基準', tags:['分類','線性'] },
-      { v:'mlp',      t:'MLP', s:'通用前饋網路', tags:['分類','回歸'] },
-      { v:'mlp_bn',   t:'MLP + BatchNorm', s:'更穩定的訓練', tags:['分類','回歸'] },
-      { v:'deepmlp',  t:'Deep MLP', s:'更深的特徵抽取', tags:['分類','回歸'] },
-      { v:'wide_deep',t:'Wide & Deep', s:'線性 + 非線性混合', tags:['分類','回歸'] },
-      { v:'tabnet',   t:'TabNet-like', s:'表格資料友善（簡化）', tags:['分類','回歸'] },
-      { v:'poly',     t:'Polynomial Regression', s:'非線性回歸基準', tags:['回歸'] },
-      { v:'lstm',     t:'LSTM', s:'序列 / 時間序列', tags:['序列'] },
-      { v:'rnn',      t:'RNN', s:'序列 / 時間序列', tags:['序列'] },
+      {
+        v:'linear', t:'Linear Regression',
+        intro:'線性關係下的回歸基準，訓練快、可作為可解釋基線。',
+        uses:['回歸','特徵方向/強度檢視','作為基準比較'],
+        depth:'1 層（Dense 直出）', explain:'高',
+        details:`最小化 MSE 的線性模型。假設線性可分、殘差同方差；權重可直接反映特徵對輸出的線性影響。`
+      },
+      {
+        v:'logistic', t:'Logistic Regression',
+        intro:'最經典的分類基線，解釋性佳。',
+        uses:['二元/多類分類','概率輸出','特徵權重解釋'],
+        depth:'1 層（Dense 直出）', explain:'高',
+        details:`使用 sigmoid/softmax 將線性組合映射到機率空間，以交叉熵訓練；權重方向與大小可直觀解釋。`
+      },
+      {
+        v:'mlp', t:'MLP',
+        intro:'通用前饋網路，對非線性表格資料很實用。',
+        uses:['分類','回歸','特徵交互擬合'],
+        depth:'2–3 層（Dense）', explain:'中',
+        details:`多層感知機以 ReLU/Tanh 等非線性堆疊 Dense 層，可擬合複雜關係；可搭配 L2/Dropout 正則化。`
+      },
+      {
+        v:'mlp_bn', t:'MLP + BatchNorm',
+        intro:'加入 BatchNorm 提升收斂穩定與速度。',
+        uses:['分類','回歸','非線性表格'],
+        depth:'2–3 層（含 BN）', explain:'中',
+        details:`Batch Normalization 穩定層內分布，降低梯度消失/爆炸風險；與 Dropout 搭配常有較佳泛化。`
+      },
+      {
+        v:'deepmlp', t:'Deep MLP',
+        intro:'更深的 MLP，抽取更高階特徵。',
+        uses:['複雜特徵交互','中大型資料集'],
+        depth:'3–5 層', explain:'中',
+        details:`更多層數與單元數提升表達力，但需正則化與良好早停策略避免過擬合。`
+      },
+      {
+        v:'wide_deep', t:'Wide & Deep',
+        intro:'線性（Wide）+ 非線性（Deep）混合，兼顧記憶與泛化。',
+        uses:['稀疏特徵','大量類別 One-Hot','推薦/廣告'],
+        depth:'3 層左右', explain:'中',
+        details:`Wide 分支擅長記憶共現特徵；Deep 分支擅長泛化，新樣本也能表現不錯。`
+      },
+      {
+        v:'tabnet', t:'TabNet-like',
+        intro:'參考 TabNet 概念的簡化版，對表格友善。',
+        uses:['表格資料','可部分觀察注意力'],
+        depth:'~3 層（簡化）', explain:'中',
+        details:`以稀疏注意力做特徵選擇的想法，這裡為輕量化實作，非完整 TabNet。`
+      },
+      {
+        v:'poly', t:'Polynomial Regression',
+        intro:'非線性回歸基線，能擬合曲線關係。',
+        uses:['回歸基準','小型資料集'],
+        depth:'2 層（隱層近似多項式）', explain:'中',
+        details:`透過非線性映射近似多項式基底；注意高階易過擬合，搭配正則化較穩。`
+      },
+      {
+        v:'lstm', t:'LSTM',
+        intro:'長短期記憶網路，處理序列/時間序列。',
+        uses:['時間序列預測','序列分類/回歸'],
+        depth:'2–3 層（LSTM + Dense）', explain:'中',
+        details:`LSTM 的門控機制能捕捉長期依賴；表格需 reshape 為序列特徵時使用。`
+      },
+      {
+        v:'rnn', t:'RNN',
+        intro:'循環網路基礎款，序列任務的輕量選擇。',
+        uses:['簡單序列','短期依賴'],
+        depth:'2–3 層（RNN + Dense）', explain:'中',
+        details:`SimpleRNN 適合較短的依賴；較長依賴建議改 LSTM/GRU。`
+      },
     ];
+  
     const MLTREE = [
-      { v:'tree', t:'Decision Tree', s:'可解釋，容易過擬合', tags:['分類','回歸'] },
-      { v:'rf',   t:'Random Forest', s:'集成樹，表現穩定', tags:['分類','回歸'] },
-      { v:'knn',  t:'KNN', s:'鄰近度基準，需正規化', tags:['分類','回歸'] },
-      { v:'svm',  t:'SVM', s:'間隔最大化，核技巧可強', tags:['分類','回歸'] },
-      { v:'nb',   t:'Naive Bayes', s:'朴素假設，計算快', tags:['分類'] },
+      {
+        v:'tree', t:'Decision Tree',
+        intro:'可視覺化、可追蹤決策路徑，解釋性極佳。',
+        uses:['分類','回歸','規則提取'],
+        depth:'樹深可調', explain:'很高',
+        details:`以資訊增益/基尼等準則遞迴切分；每條路徑就是一個決策規則。過深易過擬合，建議限制深度/葉節點。`
+      },
+      {
+        v:'rf', t:'Random Forest',
+        intro:'多棵隨機樹的集成，穩定可靠。',
+        uses:['分類','回歸','特徵重要度'],
+        depth:'多樹（各自的樹深可調）', explain:'中（可看重要度）',
+        details:`Bagging + 隨機特徵子集減少方差；提供 Gini/Permutation 重要度；對尺度不敏感。`
+      },
+      {
+        v:'knn', t:'KNN',
+        intro:'基於距離的鄰近法，訓練幾乎零成本。',
+        uses:['分類','回歸','小資料基準'],
+        depth:'無層（惰性學習）', explain:'中',
+        details:`以距離度量找 K 個鄰居，多數表決或平均；需正規化；高維下距離不敏感需小心。`
+      },
+      {
+        v:'svm', t:'SVM',
+        intro:'最大間隔分類器，可搭核技巧。',
+        uses:['分類','回歸（SVR）','中小資料'],
+        depth:'無層（決策邊界）', explain:'中',
+        details:`線性可分下最大化間隔；核技巧映射到高維特徵空間；對超參數 C、γ 敏感。`
+      },
+      {
+        v:'nb', t:'Naive Bayes',
+        intro:'條件獨立假設的貝氏分類器，速度快。',
+        uses:['文字分類','高維稀疏','基準模型'],
+        depth:'無層（機率模型）', explain:'高',
+        details:`在條件獨立假設下估計先驗與似然；參數少、對小數據很穩；特徵獨立性違反時精度會降。`
+      },
     ];
-
+  
     let lastSelectedBtn = null;
-
-    function makeCard({ v, t, s, tags }) {
+  
+    function pill(text){ return `<span class="badge">${text}</span>`; }
+    function metaRow({uses, depth, explain}){
+      return `
+        <div class="model-meta">
+          <span class="meta-item sep">·</span>
+          <span class="meta-item">層數：<b>${depth || '—'}</b></span>
+          <span class="meta-item sep">·</span>
+          <span class="meta-item">可解釋性：<b>${explain || '—'}</b></span>
+        </div>`;
+    }
+  
+    // richer card
+    function makeCard(m) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'model-card';
-      btn.dataset.model = v;
+      btn.dataset.model = m.v;
+  
+      const usesBadges = (m.uses || []).slice(0,3).map(pill).join('');
       btn.innerHTML = `
-        <div class="title">${t}</div>
-        <div class="desc" style="font-size:12px;color:#666;">${s}</div>
-        <div class="badges">${(tags || []).map(x => `<span class="badge">${x}</span>`).join('')}</div>`;
-      btn.addEventListener('click', () => {
+        <div class="title">${m.t}</div>
+        <div class="desc">${m.intro}</div>
+        ${metaRow(m)}
+        <div class="badges">${usesBadges}</div>
+  
+        <details class="model-more">
+          <summary>更多介紹與技術原理</summary>
+          <div class="more-body">
+            <div class="more-h">技術原理</div>
+            <div class="more-text">${m.details || '—'}</div>
+          </div>
+        </details>
+      `;
+  
+      btn.addEventListener('click', (e) => {
+        // 讓展開/收合不影響選取邏輯
+        if (e.target.closest('summary')) return;
         if (lastSelectedBtn) lastSelectedBtn.classList.remove('selected');
         lastSelectedBtn = btn; btn.classList.add('selected');
-        AML.state.selectedModel = v;
-        if (typeof AML.showMLParams === 'function') AML.showMLParams(v);
+        AML.state.selectedModel = m.v;
+        if (typeof AML.showMLParams === 'function') AML.showMLParams(m.v);
       });
+  
       return btn;
     }
-
+  
     function renderGrid() {
       grid.innerHTML = '';
       const t1 = document.createElement('div');
@@ -295,18 +417,18 @@
       t1.style.cssText = 'grid-column:1/-1;font-weight:600;margin-top:6px;color:#444;';
       grid.appendChild(t1);
       TFJS.forEach(m => grid.appendChild(makeCard(m)));
-
+  
       const t2 = document.createElement('div');
       t2.textContent = '⚡ ML-bundle.js';
       t2.style.cssText = 'grid-column:1/-1;font-weight:600;margin-top:10px;color:#444;';
       grid.appendChild(t2);
       MLTREE.forEach(m => grid.appendChild(makeCard(m)));
     }
-
+  
     function setMode(mode) {
       AML.state.mode = mode;
       [...modeGroup.querySelectorAll('.mode-btn')].forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-
+  
       if (mode === 'auto') {
         AML.state.customEnabled = false;
         grid.classList.add('hidden');
@@ -324,23 +446,21 @@
         if (customBox) customBox.style.display = 'block';
         if (!AML.state.selectedModel) AML.state.selectedModel = 'mlp';
         if (typeof AML.showMLParams === 'function') AML.showMLParams(AML.state.selectedModel);
-        // 確保拖拉事件只綁一次
-        wireLayerListEventsOnce();
-        // 初次渲染
-        AML.renderCustomLayers();
+        if (typeof wireLayerListEventsOnce === 'function') wireLayerListEventsOnce();
+        if (typeof AML.renderCustomLayers === 'function') AML.renderCustomLayers();
       }
     }
-
+  
     modeGroup?.addEventListener('click', (e) => {
       const btn = e.target.closest('.mode-btn');
       if (!btn) return;
       setMode(btn.dataset.mode);
     });
-
+  
     // 預設 Auto
     setMode(AML.state.mode || 'auto');
   };
-
+  
   /* --------------------------
    * TF.js makeModel（維持原功能）
    * -------------------------- */

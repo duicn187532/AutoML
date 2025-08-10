@@ -453,7 +453,7 @@
       meta.task === 'classification'
         ? `Best Val Accuracy: ${(Number(bestScore) || 0).toFixed(4)}`
         : `Best Val MSE: ${(Number(bestScore) || 0).toFixed(6)}`;
-    $('finalMetric').textContent = `使用模型：${bestModelType}`;
+    $('bestModelUsed').textContent = `使用模型：${bestModelType}`;
     setStatus(`✅ 進階 AutoML 選出最佳模型：${bestModelType} (${bestKind})`);
 
     return { bestModel, bestModelType, bestScore, bestKind, trail };
@@ -644,7 +644,7 @@
               AML.state.meta.task === 'classification'
                 ? `Best Val Accuracy: ${(Number(bestScore) || 0).toFixed(4)}`
                 : `Best Val MSE: ${(Number(bestScore) || 0).toFixed(6)}`;
-            $('finalMetric').textContent = `使用模型：${bestModelType}`;
+            // $('finalMetric').textContent = `使用模型：${bestModelType}`;
 
             AML.state.meta.modelType = bestModelType;
 
