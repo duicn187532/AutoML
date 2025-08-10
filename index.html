@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <title>AutoML (TF.js + ML.js)</title>
+    <title>AutoML 小幫手</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- libs -->
     <script src="public/ml-bundle.js"></script>
@@ -37,6 +37,11 @@
                 <select id="targetSelect">
                     <option value="">請選擇目標欄位</option>
                 </select>
+                <label>
+                    <input type="checkbox" id="normalizeTarget">
+                    標準化目標值（回歸推薦）
+                </label>
+
 
                 <h4 style="margin-top:16px;">🛠 欄位型別與是否作為特徵</h4>
                 <div class="muted">可手動覆寫自動推斷。</div>
@@ -69,133 +74,185 @@
         </div>
     </section>
 
-    <!-- 2) 模型設定 -->
-    <section id="tab-config" class="hidden">
-        <div class="row">
-            <div class="card" style="flex:2;">
-                <h3>🧠 訓練模型設定</h3>
-                <label>任務類型</label>
-                <select id="taskSelect">
-                    <option value="auto">自動判斷</option>
-                    <option value="classification">分類任務</option>
-                    <option value="regression">回歸任務</option>
-                </select>
-
-                <label>模型選擇</label>
-                <select id="modelSelect">
-                    <option value="auto">Auto（自動選擇）</option>
-
-                    <optgroup label="🔥 TensorFlow.js">
-                        <option value="linear">Linear Regression（回歸）</option>
-                        <option value="logistic">Logistic Regression（分類）</option>
-                        <option value="mlp">MLP（分類/回歸）</option>
-                        <option value="mlp_bn">MLP + BatchNorm（分類/回歸）</option>
-                        <option value="deepmlp">Deep MLP（較深）</option>
-                        <option value="wide_deep">Wide &amp; Deep（分類/回歸）</option>
-                        <option value="tabnet">TabNet-like（簡化，分類/回歸）</option>
-                        <option value="poly">Polynomial Regression（回歸）</option>
-                        <option value="lstm">LSTM（序列預測）</option>
-                        <option value="rnn">RNN（序列預測）</option>
-
-                    </optgroup>
-
-                    <optgroup label="⚡ ML-bundle.js">
-                        <option value="tree">Decision Tree（分類/回歸）</option>
-                        <option value="rf">Random Forest（分類/回歸）</option>
-                        <option value="knn">K-Nearest Neighbors（分類/回歸）</option>
-                        <option value="svm">SVM（分類/回歸）</option>
-                        <option value="nb">Naive Bayes（分類）</option>
-                    </optgroup>
-                </select>
-<!-- ✅ 進階模式切換 -->
-<div style="margin-top: 12px;">
-    <label><input type="checkbox" id="customModelToggle"> 啟用進階模式（自訂模型層）</label>
-  </div>
+<!-- 2) 模型設定 -->
+<section id="tab-config" class="hidden">
+    <div class="row">
+      <div class="card" style="flex:2;">
+        <h3>🧠 訓練模型設定</h3>
   
-  <!-- 🧠 進階層設定（預設隱藏） -->
-  <div id="customLayersContainer" style="display: none; margin-top: 12px;">
-    <h4>📐 自訂層設定</h4>
+        <label>任務類型</label>
+        <select id="taskSelect">
+          <option value="auto">自動判斷</option>
+          <option value="classification">分類任務</option>
+          <option value="regression">回歸任務</option>
+        </select>
   
-    <!-- 🔽 層類型選擇器 -->
-    <div style="margin-bottom: 8px;">
-      <label for="layerTypeSelect">選擇層類型：</label>
-      <select id="layerTypeSelect">
-        <option value="dense">Dense（全連接層）</option>
-        <option value="dropout">Dropout（隨機失活）</option>
-        <option value="batchnorm">BatchNorm（批次正規化）</option>
-        <option value="activation">Activation（激活函數）</option>
-        <option value="flatten">Flatten（展平）*限3D以上</option>
-      </select>
-      <button type="button" onclick="addLayerFromUI()">➕ 新增層</button>
+        <!-- A. 模式按鈕 -->
+        <div class="mode-group" id="modelModeGroup" style="margin:8px 0 12px;">
+          <button type="button" class="mode-btn active" data-mode="auto">
+            <div class="mode-title">🪄 自動選模型</div>
+            <div class="mode-desc">依任務與驗證分數自動挑最佳</div>
+          </button>
+          <button type="button" class="mode-btn" data-mode="preset">
+            <div class="mode-title">🎛️ 選擇內建模型</div>
+            <div class="mode-desc">點選卡片挑一個現成模型</div>
+          </button>
+          <button type="button" class="mode-btn" data-mode="custom">
+            <div class="mode-title">🧩 自訂模型層</div>
+            <div class="mode-desc">用積木建立自己的網路結構</div>
+          </button>
+        </div>
+  
+        <!-- B. 內建模型卡片容器（預設隱藏；JS 會塞卡片進來） -->
+        <div id="presetModels" class="model-grid hidden" style="margin-top:8px;"></div>
+  
+        <!-- ✅ 自訂層容器（預設隱藏；custom 模式才顯示） -->
+        <div id="customLayersContainer" style="display:none; margin-top:12px;">
+          <h4>📐 自訂層設定</h4>
+          <div style="margin-bottom:8px;">
+            <label for="layerTypeSelect">選擇層類型：</label>
+            <select id="layerTypeSelect">
+              <option value="dense">Dense（全連接層）</option>
+              <option value="dropout">Dropout（隨機失活）</option>
+              <option value="batchnorm">BatchNorm（批次正規化）</option>
+              <option value="activation">Activation（激活函數）</option>
+              <option value="flatten">Flatten（展平）</option>
+            </select>
+            <button type="button" onclick="addLayerFromUI()">➕ 新增層</button>
+          </div>
+          <!-- 🧱 層列表 -->
+          <div id="layerList"></div>
+        </div>
+  
+        <!-- 超參數區塊 -->
+        <div class="row" style="margin-top:10px;">
+          <div>
+            <label>⏱ 訓練輪數 (epochs)</label>
+            <input type="number" id="epochs" value="50" min="1" max="500" />
+          </div>
+          <div>
+            <label>📦 批次大小 (batch)</label>
+            <input type="number" id="batchSize" value="32" min="8" max="512" />
+          </div>
+          <div>
+            <label>📉 學習率 (learning rate)</label>
+            <input type="number" id="lr" value="0.001" step="0.0001" min="0.00001" max="0.1" />
+            <label>📉 學習率策略</label>
+            <select id="lrSchedule">
+              <option value="constant">固定學習率 (Constant)</option>
+              <option value="step_decay">階梯衰減 (Step Decay)</option>
+              <option value="exp_decay">指數衰減 (Exponential Decay)</option>
+              <option value="cosine_decay">餘弦衰減 (Cosine Decay)</option>
+            </select>
+          </div>
+          <div>
+            <label>📏 訓練比例</label>
+            <input type="number" id="trainRatio" value="0.8" step="0.05" min="0.5" max="0.95" />
+          </div>
+        </div>
+        <!-- 放在訓練模型設定卡片的後面，同一個 .row 裡 -->
+<div id="mlParams" class="card hidden" style="margin-left:12px; min-width:320px;">
+    <h3>🔧 傳統 ML 參數</h3>
+  
+    <!-- Tree -->
+    <div id="params_tree" class="hidden">
+      <label>最大樹深度 (max_depth)</label>
+      <input type="number" id="maxDepth" value="6" min="1" max="100" />
+      <label style="margin-top:8px;">最小分裂樣本數 (min_samples_split)</label>
+      <input type="number" id="minSamplesSplit" value="2" min="2" />
     </div>
   
-    <!-- 🧱 層列表 -->
-    <div id="layerList"></div>
+    <!-- Random Forest -->
+    <div id="params_rf" class="hidden">
+      <label>最大樹深度 (max_depth)</label>
+      <input type="number" id="maxDepth" value="6" min="1" max="100" />
+      <label style="margin-top:8px;">最小分裂樣本數 (min_samples_split)</label>
+      <input type="number" id="minSamplesSplit" value="2" min="2" />
+      <label style="margin-top:8px;">樹的數量 (n_estimators)</label>
+      <input type="number" id="nEstimators" value="100" min="1" />
+    </div>
+  
+    <!-- KNN -->
+    <div id="params_knn" class="hidden">
+      <label>鄰居數 (k)</label>
+      <input type="number" id="knnK" value="5" min="1" />
+      <label style="margin-top:8px;">權重 (weights)</label>
+      <select id="knnWeights">
+        <option value="uniform">uniform</option>
+        <option value="distance">distance</option>
+      </select>
+      <label style="margin-top:8px;">距離 (metric)</label>
+      <select id="knnMetric">
+        <option value="euclidean">euclidean</option>
+        <option value="manhattan">manhattan</option>
+        <option value="minkowski">minkowski</option>
+      </select>
+      <div id="knnPWrap" style="margin-top:8px;">
+        <label>Minkowski p</label>
+        <input type="number" id="knnP" value="2" min="1" step="1" />
+      </div>
+    </div>
+  
+    <!-- SVM -->
+    <div id="params_svm" class="hidden">
+      <label>懲罰係數 (C)</label>
+      <input type="number" id="svmC" value="1" min="0.0001" step="0.1" />
+      <label style="margin-top:8px;">核函數 (kernel)</label>
+      <select id="svmKernel">
+        <option value="rbf">rbf</option>
+        <option value="linear">linear</option>
+        <option value="poly">poly</option>
+        <option value="sigmoid">sigmoid</option>
+      </select>
+      <label style="margin-top:8px;">γ (gamma)</label>
+      <select id="svmGamma">
+        <option value="scale">scale</option>
+        <option value="auto">auto</option>
+      </select>
+    </div>
+  
+    <!-- Naive Bayes -->
+    <div id="params_nb" class="hidden">
+      <label>平滑參數 (alpha)</label>
+      <input type="number" id="nbAlpha" value="1.0" min="0" step="0.1" />
+    </div>
+  
+    <div class="muted" style="margin-top:10px;">
+      ※ 只有在「🎛️ 選擇內建模型」且選到傳統 ML 模型時顯示本區。
+    </div>
   </div>
   
-                <div class="row" style="margin-top:10px;">
-                    <div>
-                        <label>⏱ 訓練輪數 (epochs)</label>
-                        <input type="number" id="epochs" value="50" min="1" max="500" />
-                    </div>
-                    <div>
-                        <label>📦 批次大小 (batch)</label>
-                        <input type="number" id="batchSize" value="32" min="8" max="512" />
-                    </div>
-                    <div>
-                        <label>📉 學習率 (learning rate)</label>
-                        <input type="number" id="lr" value="0.001" step="0.0001" min="0.00001" max="0.1" />
-                        <label>📉 學習率策略</label>
-                        <select id="lrSchedule">
-                            <option value="constant">固定學習率 (Constant)</option>
-                            <option value="step_decay">階梯衰減 (Step Decay)</option>
-                            <option value="exp_decay">指數衰減 (Exponential Decay)</option>
-                            <option value="cosine_decay">餘弦衰減 (Cosine Decay)</option>
-                        </select>
-
-                    </div>
-                    <div>
-                        <label>📏 訓練比例</label>
-                        <input type="number" id="trainRatio" value="0.8" step="0.05" min="0.5" max="0.95" />
-                    </div>
-                </div>
-                <!-- Tree 模型額外參數（預設隱藏） -->
-                <div id="treeParams" style="display: none; margin-top: 16px;">
-                    <h4>🌳 Tree 模型參數設定</h4>
-                    <label>最大樹深度 (max_depth)</label>
-                    <input type="number" id="maxDepth" value="6" min="1" max="50" />
-
-                    <label style="margin-top: 8px;">最小分裂樣本數 (min_samples_split)</label>
-                    <input type="number" id="minSamplesSplit" value="2" min="2" />
-
-                    <label style="margin-top: 8px;">樹的數量 (n_estimators) — 只適用於隨機森林</label>
-                    <input type="number" id="nEstimators" value="100" min="1" />
-                </div>
-
-
-                <div style="margin-top:12px;">
-                    <label><input type="checkbox" id="normalize" checked /> 📏 MinMax 正規化（取消則用 Z-score）</label>
-                </div>
-            </div>
-
-            <div class="card">
-                <button id="resetModelBtn" style="margin-top:8px;background:#e74c3c;">🧹 載入前清空目前模型</button>
-                <h3>📥 載入既有 TF.js 模型</h3>
-                <label>📄 模型結構（model.json）</label>
-                <input type="file" id="modelJson" accept=".json">
-
-                <label>💾 權重檔（.bin）</label>
-                <input type="file" id="modelBin" accept=".bin">
-
-                <label>⚙️ 前處理設定（metadata.json）</label>
-                <input type="file" id="metaJson" accept=".json">
-
-                <button id="loadModelBtn" style="margin-top:8px;">📂 載入模型與設定</button>
-                <div id="loadStatus" class="muted"></div>
-            </div>
+  
+        <div style="margin-top:12px;">
+          <label><input type="checkbox" id="normalize" checked /> 📏 MinMax 正規化（取消則用 Z-score）</label>
         </div>
-    </section>
-
+      </div>
+    </div>
+  
+    <!-- ⤵️ 底部收合：載入既有 TF.js 模型 -->
+    <details class="collapsible-card" style="margin-top:16px;">
+      <summary style="cursor:pointer; font-weight:600;">
+        📂 載入既有 TF.js 模型 <span class="muted" style="font-weight:400;">（點此展開/收合）</span>
+      </summary>
+      <div class="card" style="margin-top:8px;">
+        <button id="resetModelBtn" style="margin-top:8px;background:#e74c3c;">🧹 載入前清空目前模型</button>
+        <h3>📥 載入既有 TF.js 模型</h3>
+  
+        <label>📄 模型結構（model.json）</label>
+        <input type="file" id="modelJson" accept=".json">
+  
+        <label>💾 權重檔（.bin）</label>
+        <input type="file" id="modelBin" accept=".bin">
+  
+        <label>⚙️ 前處理設定（metadata.json）</label>
+        <input type="file" id="metaJson" accept=".json">
+  
+        <button id="loadModelBtn" style="margin-top:8px;">📂 載入模型與設定</button>
+        <div id="loadStatus" class="muted"></div>
+      </div>
+    </details>
+  </section>
+  
     <!-- 3) 訓練 -->
     <section id="tab-train" class="hidden">
         <div class="row">
@@ -214,7 +271,8 @@
                         <div id="finalMetric">—</div>
                     </div>
                     <div class="metric">
-                        <pre id="autoLog" style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 8px; border: 1px solid #ccc;"></pre>
+                        <pre id="autoLog"
+                            style="max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 8px; border: 1px solid #ccc;"></pre>
                         <div class="muted">最佳模型</div>
                         <div id="bestModelUsed">—</div>
                     </div>
@@ -223,8 +281,8 @@
                 <div id="modelSummary" class="card" style="padding: 16px; margin-top: 24px;">
                     <h3>📋 模型結構（Model Summary）</h3>
                     <pre id="summaryText" style="white-space: pre-wrap; font-family: monospace;"></pre>
-                  </div>
-                  
+                </div>
+
                 <div style="margin-top:16px; padding-top: 16px; border-top:1px solid #eee;">
                     <h4>💾 匯出</h4>
                     <button id="downloadModelBtn" disabled>📥 下載 TF.js 模型</button>
@@ -438,8 +496,19 @@
     </section>
 
 
-    <!-- 主腳本（整合版） -->
-    <script src="script.js"></script>
+    <!-- App scripts -->
+    <script src="./js/namespace.js"></script>
+    <script src="./js/utils.js"></script>
+    <script src="./js/metrics.js"></script>
+    <script src="./js/viz.js"></script>
+    <script src="./js/preprocess.js"></script>
+    <script src="./js/lr.js"></script>
+    <script src="./js/models.js"></script>
+    <script src="./js/training.js"></script>
+    <script src="./js/prediction.js"></script>
+    <script src="./js/exports.js"></script>
+    <script src="./js/config.js"></script>
+    <script src="./js/main.js"></script>
 </body>
 
 </html>

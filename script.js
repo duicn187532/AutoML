@@ -268,7 +268,7 @@ function buildLabelMapping(yRaw) {
 }
 function prepareXY(data, target, normalize) {
   const yRaw = data.map(r => r[target]);
-  // 從 UI 讀取欄位設定
+  // 讀欄位設定（原樣）
   const rows = [...document.querySelectorAll('#varTable tbody tr')];
   const featureCols = [], colTypes = {};
   rows.forEach(row => {
@@ -284,13 +284,46 @@ function prepareXY(data, target, normalize) {
       } else colTypes[colName] = typeSel;
     }
   });
+
   const prep = buildPreprocessorCustom(data, target, featureCols, colTypes, normalize);
   const X = transformFeatures(data, prep);
+
   let y, labelInfo = null;
   let task = document.getElementById('taskSelect').value;
   if (task === 'auto') task = inferTaskFromY(yRaw);
-  if (task === 'classification') { labelInfo = buildLabelMapping(yRaw); y = yRaw.map(v => labelInfo.map[v]); prep.labelInfo = labelInfo; }
-  else { y = yRaw.map(v => parseFloat(v)); }
+
+  if (task === 'classification') {
+    labelInfo = buildLabelMapping(yRaw);
+    y = yRaw.map(v => labelInfo.map[v]);
+    prep.labelInfo = labelInfo;
+
+  } else {
+    // 回歸
+    y = yRaw.map(v => parseFloat(v));
+
+    const normTarget = !!document.getElementById('normalizeTarget')?.checked;
+
+    // 先清空，避免殘留
+    prep.normalizeTarget = false;
+    delete prep.yMean;
+    delete prep.yStd;
+
+    if (normTarget) {
+      const yTensor = tf.tensor1d(y);
+      const { mean, variance } = tf.moments(yTensor);
+      const yMean = mean.arraySync();
+      const yStd  = Math.sqrt(variance.arraySync()) || 1;
+
+      if (Number.isFinite(yStd) && yStd > 0) {
+        y = y.map(v => (v - yMean) / yStd);
+        prep.normalizeTarget = true;
+        prep.yMean = yMean;
+        prep.yStd  = yStd;
+      }
+      yTensor.dispose(); mean.dispose(); variance.dispose();
+    }
+  }
+
   return { X, y, meta: { ...prep, targetCol: target, task } };
 }
 
@@ -560,7 +593,7 @@ function makeModel(
     if (dropout > 0) model.add(tf.layers.dropout({ rate: dropout }));
   };
 
-    // ===== LSTM 家族 =====
+  // ===== LSTM 家族 =====
   if (['rnn', 'lstm'].includes(modelType)) {
     // 📌 RNN/LSTM 需要 3D 輸入
     model.add(tf.layers.reshape({ targetShape: [inputDim, 1], inputShape: [inputDim] }));
@@ -572,7 +605,7 @@ function makeModel(
     }
 
     model.add(tf.layers.dense({ units: 16, activation: 'relu' }));
-  } 
+  }
 
   // ===== MLP 家族 =====
   if (modelType === 'mlp') {
@@ -764,6 +797,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const parsed = JSON.parse(cleaned);
       if (!parsed || !parsed.featureCols || !parsed.colTypes) throw new Error('metadata.json 結構不完整');
       meta = parsed;
+      if (meta.normalizeTarget == null) meta.normalizeTarget = false;
+
 
       loadStatus.textContent = '✅ 模型與設定載入完成';
       document.getElementById('predictBtn').disabled = false;
@@ -828,7 +863,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         for (const modelType of candidates) {
           statusEl.textContent = `AutoML 嘗試模型：${modelType}`;
-        
+
           // 1) 建模型時傳入 modelType
           const model = makeModel(
             Xtr[0].length,
@@ -839,26 +874,26 @@ document.addEventListener('DOMContentLoaded', () => {
             scheduleType,
             epochs
           );
-        
+
           const isSequenceModel = ['rnn', 'lstm'].includes(modelType);
 
           const xTr = isSequenceModel
-          // 注意：這裡要呼叫小寫的 Xtr
-          ? tf.tensor2d(Xtr).reshape([Xtr.length, Xtr[0].length, 1])
-          : tf.tensor2d(Xtr);
+            // 注意：這裡要呼叫小寫的 Xtr
+            ? tf.tensor2d(Xtr).reshape([Xtr.length, Xtr[0].length, 1])
+            : tf.tensor2d(Xtr);
           const yTrT = tf.tensor1d(ytr, 'float32');
           const xTe = isSequenceModel
-          ? tf.tensor2d(Xte).reshape([Xte.length, Xtr[0].length, 1])
-          : tf.tensor2d(Xte);
+            ? tf.tensor2d(Xte).reshape([Xte.length, Xtr[0].length, 1])
+            : tf.tensor2d(Xte);
           const yTeT = tf.tensor1d(yte, 'float32');
 
 
 
 
-        
+
           let currentBest = meta.task === 'classification' ? 0 : Infinity;
           let history;
-        
+
           try {
             history = await model.fit(xTr, yTrT, {
               epochs,
@@ -871,13 +906,13 @@ document.addEventListener('DOMContentLoaded', () => {
                   const metric = meta.task === 'classification'
                     ? logs.val_accuracy ?? logs.val_acc ?? 0
                     : logs.val_loss ?? Infinity;
-        
+
                   if (meta.task === 'classification') {
                     if (metric > currentBest) currentBest = metric;
                   } else {
                     if (metric < currentBest) currentBest = metric;
                   }
-        
+
                   statusEl.textContent = `訓練中（${modelType}）：Epoch ${epoch + 1}/${epochs} → Score = ${metric.toFixed(4)}`;
                 }
               }
@@ -887,23 +922,23 @@ document.addEventListener('DOMContentLoaded', () => {
             model.dispose();
             continue; // 跳過這個模型
           }
-        
+
           // 訓練完成後 → 決定是否保留
           let finalMetric;
           const metricArr = meta.task === 'classification'
             ? history.history.val_accuracy ?? history.history.val_acc
             : history.history.val_loss;
-        
+
           finalMetric = Array.isArray(metricArr) ? metricArr.at(-1) : NaN;
-        
+
           const isBetter = meta.task === 'classification'
             ? finalMetric > bestScore
             : finalMetric < bestScore;
-        
+
           const tag = meta.task === 'classification' ? 'val_accuracy' : 'val_loss';
           logAutoInfo(`AutoML 模型 ${modelType} → ${tag} = ${finalMetric.toFixed(4)}`);
           logAutoInfo(`模型 ${modelType} → best val score = ${currentBest.toFixed(4)}`);
-        
+
           if (isBetter) {
             if (bestModel) bestModel.dispose(); // 釋放前一個最佳模型
             bestModel = model;
@@ -912,9 +947,9 @@ document.addEventListener('DOMContentLoaded', () => {
           } else {
             model.dispose(); // 不是最佳 → 清掉
           }
-        
+
           xTr.dispose(); yTrT.dispose(); xTe.dispose(); yTeT.dispose();
-        }        
+        }
 
         tfModel?.dispose?.();
         tfModel = bestModel;
@@ -927,7 +962,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 顯示效能
         document.getElementById('bestMetric').textContent =
-        meta.task === 'classification' ? `Best Val Accuracy: ${bestScore.toFixed(4)}` : `Best Val MSE: ${bestScore.toFixed(6)}`;
+          meta.task === 'classification' ? `Best Val Accuracy: ${bestScore.toFixed(4)}` : `Best Val MSE: ${bestScore.toFixed(6)}`;
         document.getElementById('finalMetric').textContent = `使用模型：${bestModelType}`;
 
         statusEl.textContent = `✅ 進階 AutoML 選出最佳模型：${bestModelType}`;
@@ -989,8 +1024,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } else {
           const mse = yte.reduce((s, yv, i) => s + Math.pow(yv - pred[i], 2), 0) / yte.length;
-          document.getElementById('bestMetric').textContent = `MSE = ${mse.toFixed(6)}`;
-          document.getElementById('finalMetric').textContent = `Test MSE = ${mse.toFixed(6)}`;
+          const rmse = Math.sqrt(mse);
+          document.getElementById('bestMetric').textContent = `MSE = ${mse.toFixed(6)} | RMSE = ${rmse.toFixed(6)}`;
+          document.getElementById('finalMetric').textContent = `Test MSE = ${mse.toFixed(6)} | Test RMSE = ${rmse.toFixed(6)}`;
         }
 
         statusEl.textContent = '✅ 傳統 ML 訓練完成';
@@ -1045,8 +1081,8 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
               const cur = logs.val_loss ?? logs.loss;
               if (cur < best) best = cur;
-              document.getElementById('bestMetric').textContent = `Best Val MSE = ${best.toFixed(6)}`;
-              document.getElementById('finalMetric').textContent = `Val MSE = ${cur.toFixed(6)}`;
+              document.getElementById('bestMetric').textContent = `Best Val MSE = ${best.toFixed(6)} (RMSE=${Math.sqrt(best).toFixed(6)})`;
+              document.getElementById('finalMetric').textContent = `Val MSE = ${cur.toFixed(6)} (RMSE=${Math.sqrt(cur).toFixed(6)})`;
             }
             const curLR = typeof lrCb.getCurrentLR === 'function' ? lrCb.getCurrentLR() : null;
 
@@ -1059,37 +1095,37 @@ document.addEventListener('DOMContentLoaded', () => {
             statusEl.textContent = `訓練中…（Epoch ${epoch + 1}/${epochs}）`;
           },
           onTrainEnd: async () => {
-            const yTrue = yTeT.arraySync();  
+            const yTrue = yTeT.arraySync();
             const yPredProb = tfModel.predict(xTe).arraySync();
             // 把預測結果都攤平成單一數值或類別索引
             const yPred = yPredProb.map(v =>
               Array.isArray(v)
                 ? (v.length > 1
-                    ? v.indexOf(Math.max(...v))   // multi-class
-                    : v[0] > 0.5 ? 1 : 0           // binary sigmoid
-                  )
+                  ? v.indexOf(Math.max(...v))   // multi-class
+                  : v[0] > 0.5 ? 1 : 0           // binary sigmoid
+                )
                 : v > 0.5
                   ? 1
                   : 0
             );
-          
+
             if (meta.task === 'classification') {
               // ── 分類：混淆矩陣、Performance Report、ROC ──
               const classes = [...new Set(yTrue)];
               const toIdx = new Map(classes.map((c, i) => [c, i]));
               const cm = Array(classes.length)
-                           .fill(0)
-                           .map(() => Array(classes.length).fill(0));
-          
+                .fill(0)
+                .map(() => Array(classes.length).fill(0));
+
               yTrue.forEach((t, i) => {
                 const r = toIdx.get(t), c = toIdx.get(yPred[i]);
                 if (r != null && c != null) cm[r][c]++;
               });
               renderConfusionMatrix('confusionMatrixCanvas', cm, classes);
-          
+
               const metrics = calcClassificationMetrics(yTrue, yPred, classes);
               renderMetricsTable('metricsTable', metrics);
-          
+
               if (classes.length === 2) {
                 // 取 class=1 的機率作 ROC
                 const probs = yPredProb.map(v =>
@@ -1098,19 +1134,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const { fpr, tpr, auc } = calcROC(yTrue, probs);
                 renderROC('rocCanvas', fpr, tpr, auc);
               }
-            } 
+            }
             else {
               // ── 回歸：只算 MSE ──
-              const preds = yPredProb.map(v =>
-                Array.isArray(v) ? v[0] : v
-              );
-              const mse =
-                yTrue.reduce((sum, t, i) => sum + Math.pow(t - preds[i], 2), 0) /
-                yTrue.length;
-              document.getElementById('bestMetric').textContent = `MSE = ${mse.toFixed(6)}`;
-              document.getElementById('finalMetric').textContent = `Test MSE = ${mse.toFixed(6)}`;
+              //   const preds = yPredProb.map(v =>
+              //     Array.isArray(v) ? v[0] : v
+              //   );
+              //   const mse =
+              //   yTrue.reduce((sum, t, i) => sum + Math.pow(t - preds[i], 2), 0) /
+              //   yTrue.length;
+              // const rmse = Math.sqrt(mse);
+              // document.getElementById('finalMetric').textContent = `Final MSE = ${mse.toFixed(6)} | Final RMSE = ${rmse.toFixed(6)}`;
             }
-          
+
             // summary 與按鈕啟用
             const summaryText = getModelSummaryText(tfModel);
             document.getElementById('summaryText').textContent = summaryText;
@@ -1121,7 +1157,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('downloadMLModelBtn').disabled = true;
             document.getElementById('predictBtn').disabled = false;
           }
-                  }]
+        }]
       });
       xTr.dispose(); xTe.dispose(); yTrT.dispose(); yTeT.dispose();
     } catch (err) {
@@ -1188,9 +1224,19 @@ document.addEventListener('DOMContentLoaded', () => {
           const Xnew = transformFeatures(rows, meta);
 
           if (traditionalModel) {
-            const pred = traditionalModel.predict(Xnew);
+            let pred = traditionalModel.predict(Xnew);
+
+            // ✅ 只有當「訓練時」有做目標標準化才還原
+            if (meta.task === 'regression' && meta.normalizeTarget &&
+              Number.isFinite(meta.yMean) && Number.isFinite(meta.yStd)) {
+              pred = pred.map(v => (v * meta.yStd) + meta.yMean);
+            }
+
             if (meta.task === 'classification' && meta.labelInfo) {
-              lastPredRows = rows.map((r, i) => ({ ...r, 預測值: meta.labelInfo.classes[pred[i]] ?? pred[i] }));
+              lastPredRows = rows.map((r, i) => ({
+                ...r,
+                預測值: meta.labelInfo.classes[pred[i]] ?? pred[i]
+              }));
             } else {
               lastPredRows = rows.map((r, i) => ({ ...r, 預測值: pred[i] }));
             }
@@ -1200,28 +1246,44 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
           }
 
+          // === TF.js 模型預測 ===
           if (!tfModel) { alert('請先以 TF.js 訓練或在設定頁載入 TF.js 模型'); return; }
           const x = tf.tensor2d(Xnew, undefined, 'float32');
           const p = tfModel.predict(x);
+
           if (meta.task === 'classification') {
             const probs = p.arraySync();
             const cls = meta.labelInfo?.classes || [];
             const idx = probs.map(v => {
               if (Array.isArray(v)) {
-                if (v.length > 1) { let mi = 0, mv = v[0]; for (let i = 1; i < v.length; i++) if (v[i] > mv) { mv = v[i]; mi = i; } return mi; }
-                else return v[0] > 0.5 ? 1 : 0;
+                if (v.length > 1) {
+                  let mi = 0, mv = v[0];
+                  for (let i = 1; i < v.length; i++) if (v[i] > mv) { mv = v[i]; mi = i; }
+                  return mi;
+                } else return v[0] > 0.5 ? 1 : 0;
               }
               return v > 0.5 ? 1 : 0;
             });
-            lastPredRows = rows.map((r, i) => ({ ...r, 預測值: (cls[idx[i]] !== undefined ? cls[idx[i]] : idx[i]) }));
+            lastPredRows = rows.map((r, i) => ({
+              ...r,
+              預測值: (cls[idx[i]] !== undefined ? cls[idx[i]] : idx[i])
+            }));
           } else {
-            const vals = p.arraySync().map(v => Array.isArray(v) ? v[0] : v);
+            let vals = p.arraySync().map(v => Array.isArray(v) ? v[0] : v);
+
+            // ✅ 只依據訓練時的 meta.normalizeTarget 來還原
+            if (meta.task === 'regression' && meta.normalizeTarget &&
+            Number.isFinite(meta.yMean) && Number.isFinite(meta.yStd)) {
+          vals = vals.map(v => (v * meta.yStd) + meta.yMean);
+        }
+        
             lastPredRows = rows.map((r, i) => ({ ...r, 預測值: vals[i] }));
           }
           x.dispose(); p.dispose();
           renderTable('predictTable', lastPredRows.slice(0, 100));
           status.textContent = '✅ 完成（TF.js）';
           document.getElementById('downloadPredBtn').disabled = false;
+
         } catch (e) {
           console.error(e);
           status.textContent = '❌ 預測失敗：' + e.message;

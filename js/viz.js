@@ -1,0 +1,128 @@
+// 30_viz.js
+(function(){
+  const AML = window.AML;
+
+  AML.renderConfusionMatrix = function(canvasId, cm, labels){
+    if (AML.state.chartInstances[canvasId]) AML.state.chartInstances[canvasId].destroy();
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const data = {
+      labels: labels.map(l => `Pred: ${l}`),
+      datasets: labels.map((rowLabel, rowIndex) => ({
+        label: `True: ${rowLabel}`,
+        data: cm[rowIndex],
+        backgroundColor: cm[rowIndex].map(v => {
+          const maxVal = Math.max(...cm.flat());
+          const intensity = v === 0 ? 0 : v / maxVal;
+          const r = Math.floor(255 * intensity);
+          const g = Math.floor(255 * intensity);
+          const b = Math.floor(255 * (1 - intensity));
+          return `rgb(${r},${g},${b})`;
+        })
+      }))
+    };
+    AML.state.chartInstances[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data,
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'top' },
+          title: { display: true, text: 'Confusion Matrix' },
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                const trueLabel = context.dataset.label.replace('True: ', '');
+                const predLabel = context.label.replace('Pred: ', '');
+                const count = context.parsed.y;
+                return `True: ${trueLabel}, Pred: ${predLabel} = ${count}`;
+              }
+            }
+          }
+        },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+      }
+    });
+  };
+
+  AML.renderMetricsTable = function(elId, metrics){
+    const el = document.getElementById(elId);
+    let html = `<h5>Performance Report</h5>`;
+    html += `<p>Accuracy: ${(metrics.accuracy * 100).toFixed(2)}%</p>`;
+    html += `<table border="1" cellpadding="5" cellspacing="0"><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th></tr>`;
+    for (const cls in metrics.perClass){
+      const { precision, recall, f1 } = metrics.perClass[cls];
+      html += `<tr><td>${cls}</td><td>${(precision*100).toFixed(2)}%</td><td>${(recall*100).toFixed(2)}%</td><td>${(f1*100).toFixed(2)}%</td></tr>`;
+    }
+    html += `</table>`;
+    el.innerHTML = html;
+  };
+
+  AML.renderROC = function(canvasId, fpr, tpr, auc){
+    if (AML.state.chartInstances[canvasId]) AML.state.chartInstances[canvasId].destroy();
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    AML.state.chartInstances[canvasId] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: fpr,
+        datasets: [{ label: `ROC Curve (AUC = ${auc.toFixed(3)})`, data: fpr.map((x,i)=>({x, y:tpr[i]})), borderColor:'#e67e22', fill:false }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: { type: 'linear', min: 0, max: 1, title: { display: true, text: 'False Positive Rate' } },
+          y: { min: 0, max: 1, title: { display: true, text: 'True Positive Rate' } }
+        }
+      }
+    });
+  };
+
+  AML.getModelSummaryText = function(model){
+    const lines = [];
+    lines.push(`📦 Model: ${model.name || 'Unnamed Model'}`);
+    lines.push('────────────────────────────────────────────────────────────');
+    lines.push(` No  | Layer Name         | Type       | Output Shape     | Params`);
+    lines.push('────────────────────────────────────────────────────────────');
+    model.layers.forEach((layer, i) => {
+      const name = layer?.name || `layer_${i}`;
+      const className = typeof layer.getClassName === 'function' ? layer.getClassName() : (layer?.className || 'Unknown');
+      const outputShape = JSON.stringify(layer?.outputShape || '—');
+      const paramCount = layer?.countParams?.() || 0;
+      lines.push(`${String(i+1).padEnd(4)}| ${name.padEnd(20)} | ${className.padEnd(10)} | ${outputShape.padEnd(16)} | ${paramCount}`);
+    });
+    lines.push('────────────────────────────────────────────────────────────');
+    lines.push(`Total params: ${model.countParams()}`);
+    return lines.join('\n');
+  };
+
+  AML.ensureCharts = function(){
+    if (AML.state.chartsInit) return;
+    AML.state.chartsInit = True = true;
+    AML.state.charts.loss = new Chart(document.getElementById('lossChart'), {
+      type: 'line',
+      data: { labels: [], datasets: [
+        { label: 'Train Loss', data: [], borderColor: '#27ae60', backgroundColor: 'rgba(39,174,96,0.1)' },
+        { label: 'Val Loss', data: [], borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,0.1)' }
+      ]},
+      options: { responsive: true, animation: false }
+    });
+    AML.state.charts.acc = new Chart(document.getElementById('accChart'), {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Val Accuracy', data: [], borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,.1)' }] },
+      options: { responsive: true, animation: false }
+    });
+    AML.state.charts.lr = new Chart(document.getElementById('lrChart'), {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Learning Rate', data: [], borderColor: '#8e44ad', backgroundColor: 'rgba(142,68,173,0.1)' }] },
+      options: { responsive: true, animation: false }
+    });
+  };
+
+  AML.resetCharts = function(showAcc){
+    AML.ensureCharts();
+    const C = AML.state.charts;
+    C.loss.data.labels = []; C.loss.data.datasets[0].data = []; C.loss.data.datasets[1].data = []; C.loss.update();
+    C.acc.data.labels = [];  C.acc.data.datasets[0].data = [];  C.acc.update();
+    C.lr.data.labels = [];   C.lr.data.datasets[0].data = [];   C.lr.update();
+    document.getElementById('accChart').style.display = showAcc ? 'block' : 'none';
+  };
+})();

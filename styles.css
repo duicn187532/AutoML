@@ -1,161 +1,130 @@
-/* Tabular AutoML 樣式表 */
+/* ===== Tabular AutoML 樣式表（整段取代） ===== */
 
-body { 
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif; 
-    margin: 24px; 
-    background-color: #f8f9fa;
-  }
-  
-  h1 { 
-    margin-bottom: 6px; 
-    color: #2c3e50; 
-  }
-  
-  .muted { 
-    color: #666; 
-    font-size: 13px; 
-  }
-  
-  .row { 
-    display: flex; 
-    gap: 16px; 
-    flex-wrap: wrap; 
-    margin-bottom: 16px;
-  }
-  
-  .card { 
-    border: 1px solid #ddd; 
-    border-radius: 12px; 
-    padding: 20px; 
-    flex: 1; 
-    min-width: 300px;
-    background: white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  label { 
-    display: block; 
-    margin: 12px 0 6px; 
-    font-weight: 600; 
-    color: #34495e;
-  }
-  
-  input[type="number"], select { 
-    width: 120px; 
-    padding: 6px 10px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-  }
-  
-  input[type="checkbox"] { 
-    margin-right: 8px; 
-  }
-  
-  button { 
-    padding: 10px 16px; 
-    margin-top: 12px;
-    border: none;
-    border-radius: 8px;
-    background: #3498db;
-    color: white;
-    cursor: pointer;
-    font-weight: 500;
-  }
-  
-  button:hover { 
-    background: #2980b9; 
-  }
-  
-  button:disabled { 
-    background: #bdc3c7; 
-    cursor: not-allowed; 
-  }
-  
-  table { 
-    border-collapse: collapse; 
-    width: 100%; 
-    margin-top: 12px;
-    font-size: 14px;
-  }
-  
-  th, td { 
-    border: 1px solid #eee; 
-    padding: 8px 12px; 
-    text-align: left;
-  }
-  
-  th { 
-    background: #f8f9fa; 
-    font-weight: 600;
-  }
-  
-  canvas { 
-    max-height: 280px; 
-    margin-top: 12px;
-  }
-  
-  .metrics { 
-    display: flex; 
-    gap: 16px; 
-    margin-top: 16px; 
-  }
-  
-  .metric { 
-    background: #f1f3f4; 
-    padding: 12px 16px; 
-    border-radius: 8px;
-    text-align: center;
-    flex: 1;
-  }
-  
-  .tabs { 
-    display: flex; 
-    gap: 8px; 
-    margin: 16px 0; 
-  }
-  
-  .tab { 
-    padding: 12px 18px; 
-    border: 1px solid #ddd; 
-    border-radius: 8px; 
-    cursor: pointer;
-    background: white;
-    transition: all 0.2s;
-  }
-  
-  .tab.active { 
-    background: #3498db; 
-    color: white;
-    border-color: #3498db;
-  }
-  
-  .tab:hover:not(.active) { 
-    background: #ecf0f1; 
-  }
-  
-  .hidden { 
-    display: none; 
-  }
-  
-  .status-success { 
-    color: #27ae60; 
-    font-weight: 500; 
-  }
-  
-  .status-error { 
-    color: #e74c3c; 
-    font-weight: 500; 
-  }
-  
-  .status-info { 
-    color: #3498db; 
-    font-weight: 500; 
-  }
-  /* === Layer 編輯器區塊 === */
-#layerBuilder {
-  margin: 16px 0;
+/* 可調色彩變數 */
+:root{
+  --bg: #f8f9fa;
+  --surface-1: #ffffff;
+  --surface-2: #f1f5f9;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #d9dee5;
+  --primary: #3498db;
+  --primary-contrast: #ffffff;
+  --hover: #e8eef9;
+  --focus: #93c5fd;
 }
 
+/* @media (prefers-color-scheme: dark){
+  :root{
+    --bg: #0b1220;
+    --surface-1: #0f172a;
+    --surface-2: #111827;
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+    --border: #27344a;
+    --primary: #60a5fa;
+    --primary-contrast: #0b1220;
+    --hover: #1e293b;
+    --focus: #93c5fd;
+  }
+} */
+
+/* 基本布局 */
+body { 
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif; 
+  margin: 24px; 
+  background: var(--bg);
+  color: var(--text);
+}
+h1 { margin-bottom: 6px; color: #2c3e50; }
+.muted { color: #666; font-size: 13px; }
+.row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+
+.card { 
+  border: 1px solid #ddd; 
+  border-radius: 12px; 
+  padding: 20px; 
+  flex: 1; 
+  min-width: 300px;
+  background: var(--surface-1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+label { 
+  display: block; 
+  margin: 12px 0 6px; 
+  font-weight: 600; 
+  color: #34495e;
+}
+
+input[type="number"], select { 
+  width: 120px; 
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+}
+
+input[type="checkbox"] { margin-right: 8px; }
+
+/* 全站一般按鈕（不含模式按鈕/卡片） */
+button { 
+  padding: 10px 16px; 
+  margin-top: 12px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--primary-contrast);
+  cursor: pointer;
+  font-weight: 500;
+}
+button:hover { background: #2980b9; }
+button:disabled { background: #bdc3c7; cursor: not-allowed; }
+
+table { 
+  border-collapse: collapse; 
+  width: 100%; 
+  margin-top: 12px;
+  font-size: 14px;
+}
+th, td { border: 1px solid #eee; padding: 8px 12px; text-align: left; }
+th { background: #f8f9fa; font-weight: 600; }
+
+canvas { max-height: 280px; margin-top: 12px; }
+
+.metrics { display: flex; gap: 16px; margin-top: 16px; }
+.metric { 
+  background: #f1f3f4; 
+  padding: 12px 16px; 
+  border-radius: 8px;
+  text-align: center;
+  flex: 1;
+}
+
+/* 分頁 */
+.tabs { display: flex; gap: 8px; margin: 16px 0; }
+.tab { 
+  padding: 12px 18px; 
+  border: 1px solid #ddd; 
+  border-radius: 8px; 
+  cursor: pointer;
+  background: white;
+  transition: all 0.2s;
+}
+.tab.active { background: var(--primary); color: var(--primary-contrast); border-color: var(--primary); }
+.tab:hover:not(.active) { background: #ecf0f1; }
+
+/* 通用隱藏 */
+.hidden { display: none !important; }
+
+/* 狀態色 */
+.status-success { color: #27ae60; font-weight: 500; }
+.status-error { color: #e74c3c; font-weight: 500; }
+.status-info { color: #3498db; font-weight: 500; }
+
+/* === Layer 編輯器區塊 === */
+#layerBuilder { margin: 16px 0; }
 .layer-item {
   display: flex;
   align-items: center;
@@ -163,31 +132,87 @@ body {
   padding: 8px 0;
   border-bottom: 1px dashed #ccc;
 }
-
-/* 各欄位寬度控制 */
 .layer-item label {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 14px;
 }
+.layer-item input[type="number"] { width: 80px; padding: 4px; }
+.layer-item select { padding: 4px; }
+/* 這裡用輕量灰鈕，不套全站主色 */
+.layer-item button { padding: 4px 8px; background-color: #eee; border: none; cursor: pointer; color:#111; }
+.layer-item button:hover { background-color: #ddd; }
 
-.layer-item input[type="number"] {
-  width: 80px;
-  padding: 4px;
-}
-
-.layer-item select {
-  padding: 4px;
-}
-
-.layer-item button {
-  padding: 4px 8px;
-  background-color: #eee;
-  border: none;
+/* ===== 模式按鈕（Auto / Preset / Custom） ===== */
+.mode-group{ display:flex; gap:10px; flex-wrap:wrap; }
+.mode-btn{
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 12px 14px;
   cursor: pointer;
+  min-width: 220px;
+  text-align: left;
+  transition: background .15s ease, box-shadow .15s ease, border-color .15s ease, transform .02s ease-in;
 }
+.mode-btn .mode-title{ font-weight: 700; line-height: 1.2; }
+.mode-btn .mode-desc{ font-size: 12px; color: var(--muted); margin-top: 4px; }
+.mode-btn:hover{ background: var(--hover); }
+.mode-btn:active{ transform: translateY(1px); }
+.mode-btn:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+}
+/* 當前選擇：高對比實心 */
+.mode-btn.active{
+  background: var(--primary);
+  color: var(--primary-contrast);
+  border-color: transparent;
+}
+.mode-btn.active .mode-desc{ color: rgba(255,255,255,.9); }
 
-.layer-item button:hover {
-  background-color: #ddd;
+/* ===== 模型卡片（Preset 區） ===== */
+.model-grid{ 
+  display:grid; 
+  grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); 
+  gap:12px; 
+}
+.model-card{
+  display:block;
+  width:100%;
+  text-align:left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: var(--surface-1);
+  color: var(--text);
+  cursor:pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.model-card:hover{
+  border-color:#9eb6d8;
+  box-shadow: 0 2px 14px rgba(0,0,0,.06);
+  background: var(--surface-2);
+}
+.model-card.selected{
+  border-color: var(--primary);
+  /* fallback 背景 */
+  background: rgba(52,152,219,0.08);
+  /* 有支援的瀏覽器會用更漂亮的色彩混合 */
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-1));
+  box-shadow: 0 0 0 3px rgba(52,152,219,0.2);
+}
+.model-card .title{ font-weight: 700; margin-bottom: 4px; }
+.model-card .desc{ font-size: 12px; color: var(--muted); }
+.model-card .badges{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.model-card .badge{
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: var(--muted);
+  background: var(--surface-2);
 }
