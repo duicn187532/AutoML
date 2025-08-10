@@ -1,2 +1,38 @@
-# AutoML
-using tensorflow.js &amp;  ml-bundles.js build user friendly UI
+# Tabular AutoML (TF.js + ML-bundle) — README
+
+一個在瀏覽器就能跑的表格資料 AutoML + 可解釋訓練平台。支援 **CSV 上傳、特徵型別自動判斷、關係係數排序（Pearson/η/Cramér’s V）**、**Auto/預設/自訂**三種建模模式、**TF.js 深度模型**與**傳統 ML（樹/森林/KNN/SVM/NB）**、即時圖表（Loss/Acc/LR/ROC/混淆矩陣/指標表）、**模型與 metadata 輸出入**、以及 **2D Playground** 可視化決策邊界。全程在本機執行、無需伺服器與外傳資料。
+
+---
+
+## 目錄
+- [特色](#特色)
+- [快速開始](#快速開始)
+- [資料需求（CSV）](#資料需求csv)
+- [操作流程](#操作流程)
+- [模型模式與參數](#模型模式與參數)
+- [自訂層（拖拉積木）](#自訂層拖拉積木)
+- [訓練過程與圖表](#訓練過程與圖表)
+- [可解釋性與報告](#可解釋性與報告)
+- [Playground（互動視覺化）](#playground互動視覺化)
+- [模型匯出 / 匯入](#模型匯出--匯入)
+- [客製化](#客製化)
+- [常見問題與除錯](#常見問題與除錯)
+- [限制與建議](#限制與建議)
+- [檔案結構（建議）](#檔案結構建議)
+- [授權](#授權)
+
+---
+
+## 特色
+- **純前端**：TensorFlow.js + 傳統 ML（ml-bundle.js），無需後端。
+- **特徵型別自動判斷**：數值 / 類別；支援 One-Hot 與數值正規化（MinMax / Z-score）。
+- **關係係數一鍵看**：選好目標欄位即顯示各特徵與目標的相關性，並依絕對值排序（Pearson r / η / Cramér’s V）。
+- **三種建模模式**  
+  - Auto：自動嘗試多種 TF.js 與傳統 ML，邊訓練邊釋放較差模型，節省記憶體。  
+  - 預設：卡片式選型，顯示用途/層數/簡介，可展開原理。  
+  - 自訂：拖拉式積木堆層（Dense/Dropout/BatchNorm/Activation/Flatten）。
+- **圖表與度量**：Loss/Val Loss、（分類）Val Acc、學習率曲線、混淆矩陣、ROC & AUC、Precision/Recall/F1、（回歸）MSE/RMSE。
+- **可解釋性輸出**：訓練結束自動生成說明（為何選此模型、特徵選擇依據、重點指標）。
+- **模型與前處理同步**：輸出 `model.json/.bin + metadata.json`；預測時套用一致前處理。
+- **Playground**：2D 決策邊界即時渲染（合成資料/特徵變換），幫助初學者理解模型行為。
+- **記憶體友好**：嚴格 `dispose()` tensor / model；Auto 模式中隨訓練即時釋放非最佳候選。
