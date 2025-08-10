@@ -271,6 +271,11 @@
     targetSelect?.addEventListener('change', ()=>{
       const rows = AML.state?.rawData || []; const cols = AML.state?.columns || [];
       const target = targetSelect.value || '';
+      // ✅ 確保 meta 存在並更新 target
+      AML.state.meta = AML.state.meta || {};
+      AML.state.meta.target = target;
+      console.log('📌 已設定 target 欄位 =', AML.state.meta.target);
+
       if (!rows.length || !cols.length || !target){ if (varTable) varTable.style.display='none'; return; }
       const prev = readVarTableState(varTbody);
       buildVarTableWithAssoc(varTbody, cols, rows, target, prev);

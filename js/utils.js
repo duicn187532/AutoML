@@ -20,13 +20,39 @@
   };
   AML.renderTable = function(elId, rows){
     const el = document.getElementById(elId);
-    if (!rows.length){ el.innerHTML = '<div class="muted">無資料</div>'; return; }
-    const cols = Object.keys(rows[0]);
-    const head = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
-    const body = rows.map(r => '<tr>' + cols.map(c => `<td>${r[c]}</td>`).join('') + '</tr>').join('');
+    if (!rows?.length){ el.innerHTML = '<div class="muted">無資料</div>'; return; }
+  
+    let cols = Object.keys(rows[0]);
+  
+    // 優先欄位
+    const priorityCols = [];
+    if (cols.includes('預測值')) priorityCols.push('預測值');
+    const target = document.getElementById('targetSelect')?.value;
+    if (target) {
+      AML.state.meta = AML.state.meta || {};
+      AML.state.meta.target = target;
+      console.log('📌 預測前補上 target:', AML.state.meta.target);
+    }
+        if (target && cols.includes(target) && !priorityCols.includes(target)) {
+      priorityCols.push(target);
+    }
+  
+    // 重新排序：優先欄位放最前，其餘維持原順序
+    cols = [...priorityCols, ...cols.filter(c => !priorityCols.includes(c))];
+  
+    const escape = (v) => {
+      const s = (v === null || v === undefined) ? '' : String(v);
+      return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    };
+  
+    const head = '<tr>' + cols.map(c => `<th>${escape(c)}</th>`).join('') + '</tr>';
+    const body = rows.map(r =>
+      '<tr>' + cols.map(c => `<td>${escape(r[c])}</td>`).join('') + '</tr>'
+    ).join('');
+  
     el.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
   };
-  AML.safeStringify = function(obj){
+    AML.safeStringify = function(obj){
     const seen = new WeakSet();
     return JSON.stringify(obj, (key, value) => {
       if (typeof value === 'function') return undefined;

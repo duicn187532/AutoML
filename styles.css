@@ -140,45 +140,39 @@ th{
 tr:nth-child(even) td{ background: color-mix(in srgb, var(--surface-1) 92%, var(--surface-2)); }
 
 /* Charts */
-canvas{ max-height: 280px; margin-top:12px; }
+.chart-canvas {
+  max-height: 320px;
+}
 
-.metrics{
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+.large-chart {
+  max-height: 400px;
+}
+canvas {
+  width: 100%;
+  height: auto;
   margin-top: 12px;
 }
+.chart-container {
+  overflow-x: auto;
+}
 
-.metric{
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 64px;
-  padding: 12px 14px;
-  background: linear-gradient(180deg, var(--surface-1), color-mix(in srgb, var(--surface-2) 60%, transparent));
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--primary); /* 重點色條 */
-  border-radius: 0;                      /* 無圓角 */
+.metric {
   text-align: center;
-  box-shadow: var(--shadow);
-  transition: transform .06s ease, box-shadow .15s ease, border-color .15s ease;
 }
-
-.metric:hover{
-  transform: translateY(-1px);
-  box-shadow: 0 2px 10px rgba(0,0,0,.06), 0 10px 24px rgba(0,0,0,.06);
-  border-color: color-mix(in srgb, var(--primary) 25%, var(--border));
+.metric .muted {
+  font-size: 14px;
+  color: #777;
 }
-
-/* 可選：語意色條變體（直接加在 .metric 上） */
-.metric.success{ border-left-color: var(--success); }
-.metric.error{   border-left-color: var(--error);   }
-.metric.info{    border-left-color: var(--primary); }
-
-/* 內文微調（若有文字/數字分層） */
-.metric .label{ font-size: 12px; color: var(--muted); letter-spacing: .02em; text-transform: uppercase; }
-.metric .value{ font-size: 20px; font-weight: 800; line-height: 1; }
+.metric div {
+  font-size: 20px;
+  font-weight: bold;
+  margin-top: 4px;
+}
+.metrics-grid {
+  display: flex;
+  gap: 16px;
+  justify-content: space-around;
+}
 
 
 /* Utilities */
@@ -425,4 +419,24 @@ canvas{ max-height: 280px; margin-top:12px; }
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
     row-gap: 20px !important;
   }
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.chart-grid canvas {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  padding: 16px;
+  margin-bottom: 20px;
 }

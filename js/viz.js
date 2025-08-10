@@ -79,21 +79,35 @@
   AML.getModelSummaryText = function(model){
     const lines = [];
     lines.push(`📦 Model: ${model.name || 'Unnamed Model'}`);
-    lines.push('────────────────────────────────────────────────────────────');
-    lines.push(` No  | Layer Name         | Type       | Output Shape     | Params`);
-    lines.push('────────────────────────────────────────────────────────────');
+    lines.push('──────────────────────────────────────────────────────────────────────────');
+    lines.push(` No  | Layer Name         | Type       | Output Shape     | Params | Activation`);
+    lines.push('──────────────────────────────────────────────────────────────────────────');
+    
     model.layers.forEach((layer, i) => {
       const name = layer?.name || `layer_${i}`;
-      const className = typeof layer.getClassName === 'function' ? layer.getClassName() : (layer?.className || 'Unknown');
+      const className = typeof layer.getClassName === 'function' 
+        ? layer.getClassName() 
+        : (layer?.className || 'Unknown');
       const outputShape = JSON.stringify(layer?.outputShape || '—');
       const paramCount = layer?.countParams?.() || 0;
-      lines.push(`${String(i+1).padEnd(4)}| ${name.padEnd(20)} | ${className.padEnd(10)} | ${outputShape.padEnd(16)} | ${paramCount}`);
+  
+      // 取得 activation（如果有 config）
+      let activation = '';
+      if (typeof layer.getConfig === 'function') {
+        activation = layer.getConfig()?.activation ?? '';
+      }
+      if (!activation) activation = 'linear'; // 預設補上 linear
+  
+      lines.push(
+        `${String(i+1).padEnd(4)}| ${name.padEnd(20)} | ${className.padEnd(10)} | ${outputShape.padEnd(16)} | ${String(paramCount).padEnd(6)}| ${activation}`
+      );
     });
-    lines.push('────────────────────────────────────────────────────────────');
+  
+    lines.push('──────────────────────────────────────────────────────────────────────────');
     lines.push(`Total params: ${model.countParams()}`);
     return lines.join('\n');
   };
-
+  
   AML.ensureCharts = function(){
     if (AML.state.chartsInit) return;
     AML.state.chartsInit = True = true;

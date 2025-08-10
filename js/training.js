@@ -34,7 +34,7 @@
     const box = $('metricsBox'); if (box) box.style.display = 'block';
     const best = $('bestMetric'); if (best) best.textContent = '—';
     const finalM = $('finalMetric'); if (finalM) finalM.textContent = '—';
-  }
+  }  
 
   function enableButtons({ tfModel, traditionalModel }) {
     if ($('downloadModelBtn')) $('downloadModelBtn').disabled = true;
@@ -453,7 +453,7 @@
       meta.task === 'classification'
         ? `Best Val Accuracy: ${(Number(bestScore) || 0).toFixed(4)}`
         : `Best Val MSE: ${(Number(bestScore) || 0).toFixed(6)}`;
-    $('bestModelUsed').textContent = `使用模型：${bestModelType}`;
+    $('bestModelUsed').textContent = `${bestModelType}`;
     setStatus(`✅ 進階 AutoML 選出最佳模型：${bestModelType} (${bestKind})`);
 
     return { bestModel, bestModelType, bestScore, bestKind, trail };
@@ -577,7 +577,7 @@
 
           const summaryText = AML.getModelSummaryText(AML.state.tfModel);
           $('summaryText').textContent = summaryText;
-          $('modelSummary').style.display = 'block';
+          // $('modelSummary').style.display = 'block';
 
           // 👉 訓練結束一律產生報告
           await buildExplainabilityReport({ Xte, yte, meta, model: AML.state.tfModel, kind: 'tf' });
@@ -621,7 +621,17 @@
         const parts = splitDataset(X, y, ui.ratio);
         const isTraditional = Object.keys(AML.ML_MODEL_MAP).includes(ui.modelSel);
         resetMetricsUI(!isTraditional && AML.state.meta.task === 'classification');
-
+        if (AML.state.meta.task === 'classification') {
+          document.getElementById('confusionMatrixCanvas')?.parentElement.classList.remove('hidden');
+          document.getElementById('metricsTable')?.classList.remove('hidden');
+          document.getElementById('rocCanvas')?.classList.remove('hidden');
+        } else {
+          // 回歸時隱藏分類專用圖表
+          document.getElementById('confusionMatrixCanvas')?.parentElement.classList.add('hidden');
+          document.getElementById('metricsTable')?.classList.add('hidden');
+          document.getElementById('rocCanvas')?.classList.add('hidden');
+        }
+        
         // ===== A) AutoML：同時比較 TF.js + MLBundle。訓練後一律產生報告 =====
         if (ui.modelSel === 'auto') {
           try { AML.state.tfModel?.dispose?.(); } catch (_) {}
@@ -638,7 +648,7 @@
 
             const summaryText = AML.getModelSummaryText(AML.state.tfModel);
             $('summaryText').textContent = summaryText;
-            $('modelSummary').style.display = 'block';
+            // $('modelSummary').style.display = 'block';
 
             $('bestMetric').textContent =
               AML.state.meta.task === 'classification'

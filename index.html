@@ -255,55 +255,69 @@
 
     <!-- 3) 訓練 -->
     <section id="tab-train" class="hidden">
-        <div class="row">
-            <div class="card" style="flex:1;">
-                <h3>🚀 訓練模型</h3>
-                <button id="trainBtn" style="background:#27ae60;">開始訓練</button>
-                <div id="status" class="muted" style="margin-top:8px;"></div>
+        <div class="training-dashboard">
 
-                <div class="metrics" id="metricsBox" style="display:none;margin-top:12px;">
-                    <div class="metric">
-                        <div class="muted">最佳成績</div>
-                        <div id="bestMetric">—</div>
-                    </div>
-                    <div class="metric">
-                        <div class="muted">當前成績</div>
-                        <div id="finalMetric">—</div>
-                    </div>
-                    <div class="metric">
-                        <div class="muted">最佳模型</div>
-                        <div id="bestModelUsed">—</div>
-                    </div>
-                </div>
-                <!-- 訓練後的模型摘要 -->
-                <div id="modelSummary" class="card" style="padding: 16px; margin-top: 24px;">
-                    <h3>📋 模型結構（Model Summary）</h3>
-                    <pre id="summaryText" style="white-space: pre-wrap; font-family: monospace;"></pre>
-                </div>
-
-                <div style="margin-top:16px; padding-top: 16px; border-top:1px solid #eee;">
-                    <h4>💾 匯出</h4>
-                    <button id="downloadModelBtn" disabled>📥 下載 TF.js 模型</button>
-                    <button id="downloadMetaBtn" disabled>📄 下載 metadata.json</button>
-                    <button id="downloadMLModelBtn" disabled>📥 下載 ML 模型（實驗）</button>
-                </div>
-
+            <!-- 訓練控制區 -->
+            <div class="card control-panel">
+              <h3>🚀 模型訓練</h3>
+              <button id="trainBtn" class="btn btn-success">開始訓練</button>
+              <div id="status" class="muted mt-2"></div>
             </div>
-
-            <div class="card">
-                <h3>📈 訓練過程</h3>
-                <canvas id="lossChart"></canvas>
-                <canvas id="accChart" style="margin-top: 16px;"></canvas>
-                <canvas id="lrChart"></canvas>
-                <h4>📊 訓練完成後分析</h4>
-                <canvas id="confusionMatrixCanvas" style="margin-top:10px;"></canvas>
-                <div id="metricsTable"></div>
-                <canvas id="rocCanvas" style="margin-top:10px;"></canvas>
-
+          
+            <!-- 即時指標 -->
+            <div class="card metrics-panel">
+              <h3>📊 即時訓練指標</h3>
+              <div class="metrics-grid">
+                <div class="metric"><span class="muted">最佳成績</span><div id="bestMetric">—</div></div>
+                <div class="metric"><span class="muted">當前成績</span><div id="finalMetric">—</div></div>
+                <div class="metric"><span class="muted">最佳模型</span><div id="bestModelUsed">—</div></div>
+              </div>
             </div>
-        </div>
-        </div>
-    </section>
+          
+<!-- 訓練過程圖表 -->
+<div class="card charts-panel">
+    <h3>📈 訓練過程</h3>
+    <div class="chart-grid">
+      <canvas id="lossChart"></canvas>
+      <canvas id="accChart"></canvas>
+    </div>
+  
+    <details>
+      <summary style="cursor:pointer; margin-top:8px;">📉 學習率曲線（Learning Rate Schedule）</summary>
+      <canvas id="lrChart" style="margin-top:12px;"></canvas>
+    </details>
+  </div>
+            
+            <!-- 訓練後分析 -->
+            <div class="card post-analysis">
+              <h3>🔍 訓練後分析</h3>
+              <details open>
+                <summary>📋 模型結構（Model Summary）</summary>
+                <pre id="summaryText" class="model-summary"></pre>
+              </details>
+              <canvas id="confusionMatrixCanvas" class="large-chart"></canvas>
+              <div id="metricsTable" class="large-chart"></div>
+              <canvas id="rocCanvas" class="large-chart"></canvas>
+            </div>
+          
+            <!-- 匯出區 -->
+            <div class="card export-panel">
+              <h3>💾 匯出模型與設定</h3>
+              <div class="export-buttons">
+                <button id="downloadModelBtn" disabled>📥 下載 TF.js 模型</button>
+                <button id="downloadMetaBtn" disabled>📄 下載 metadata.json</button>
+                <button id="downloadMLModelBtn" disabled>📥 下載 ML 模型（實驗）</button>
+              </div>
+            </div>
+          
+            <!-- 日誌
+            <div class="card log-panel">
+              <h3>📝 訓練日誌</h3>
+              <pre id="trainingLog"></pre>
+            </div> -->
+          
+          </div>
+              </section>
 
     <!-- 4) 預測 -->
     <section id="tab-predict" class="hidden">
