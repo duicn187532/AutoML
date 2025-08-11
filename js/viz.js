@@ -2,24 +2,42 @@
 (function(){
   const AML = window.AML;
 
-  AML.renderConfusionMatrix = function(canvasId, cm, labels){
+  AML.renderConfusionMatrix = function (canvasId, cm, labels) {
     if (AML.state.chartInstances[canvasId]) AML.state.chartInstances[canvasId].destroy();
-    const ctx = document.getElementById(canvasId).getContext('2d');
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    const ctx = el.getContext('2d');
+  
+    // === Distinct, colorblind-friendly palette ===
+    const BASE_PALETTE = [
+      '#4E79A7', '#F28E2B', '#59A14F', '#E15759', '#76B7B2',
+      '#EDC948', '#B07AA1', '#FF9DA7', '#9C755F', '#BAB0AC'
+    ];
+    function hexToRgb(hex){ const h=hex.replace('#',''); return [parseInt(h.slice(0,2),16), parseInt(h.slice(2,4),16), parseInt(h.slice(4,6),16)]; }
+    function rgba(hex, a=0.9){ const [r,g,b]=hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+    function hslColor(i, n){ const hue = Math.round((360 * i) / Math.max(1,n)); return `hsl(${hue} 70% 50%)`; }
+    function pickColor(i, n){
+      return i < BASE_PALETTE.length ? BASE_PALETTE[i] : hslColor(i, n);
+    }
+  
     const data = {
       labels: labels.map(l => `Pred: ${l}`),
-      datasets: labels.map((rowLabel, rowIndex) => ({
-        label: `True: ${rowLabel}`,
-        data: cm[rowIndex],
-        backgroundColor: cm[rowIndex].map(v => {
-          const maxVal = Math.max(...cm.flat());
-          const intensity = v === 0 ? 0 : v / maxVal;
-          const r = Math.floor(255 * intensity);
-          const g = Math.floor(255 * intensity);
-          const b = Math.floor(255 * (1 - intensity));
-          return `rgb(${r},${g},${b})`;
-        })
-      }))
+      datasets: labels.map((rowLabel, rowIndex) => {
+        const base = pickColor(rowIndex, labels.length);
+        const row = cm[rowIndex];
+        return {
+          label: `True: ${rowLabel}`,
+          data: row,
+          // 固定整列顏色，確保每個類別顏色都不同
+          backgroundColor: row.map(() => rgba(base, 0.9)),
+          borderColor: row.map(() => rgba(base, 1)),
+          borderWidth: (ctx) => (ctx.dataIndex === ctx.datasetIndex ? 2 : 1), // 對角線稍加粗，容易辨識
+          hoverBackgroundColor: row.map(() => rgba(base, 1)),
+          hoverBorderWidth: 2
+        };
+      })
     };
+  
     AML.state.chartInstances[canvasId] = new Chart(ctx, {
       type: 'bar',
       data,
@@ -34,7 +52,9 @@
                 const trueLabel = context.dataset.label.replace('True: ', '');
                 const predLabel = context.label.replace('Pred: ', '');
                 const count = context.parsed.y;
-                return `True: ${trueLabel}, Pred: ${predLabel} = ${count}`;
+                const rowSum = cm[context.datasetIndex].reduce((s,v)=>s+v,0) || 1;
+                const pct = ((count / rowSum) * 100).toFixed(1);
+                return `True: ${trueLabel}, Pred: ${predLabel} = ${count} (${pct}%)`;
               }
             }
           }
@@ -43,6 +63,7 @@
       }
     });
   };
+  
 
   AML.renderMetricsTable = function(elId, metrics){
     const el = document.getElementById(elId);

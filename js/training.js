@@ -553,7 +553,7 @@
         onTrainEnd: async () => {
           // 評估 + 圖表
           const yTrue = yTeT.arraySync();
-          const yPredProb = AML.state.tfModel.predict(xTe).arraySync();
+          const yPredProb = tf.tidy(() => AML.state.tfModel.predict(xTe).arraySync());
           const yPred = yPredProb.map(v =>
             Array.isArray(v)
               ? (v.length > 1 ? v.indexOf(Math.max(...v)) : (v[0] > 0.5 ? 1 : 0))
@@ -622,7 +622,7 @@
         const isTraditional = Object.keys(AML.ML_MODEL_MAP).includes(ui.modelSel);
         resetMetricsUI(!isTraditional && AML.state.meta.task === 'classification');
         if (AML.state.meta.task === 'classification') {
-          document.getElementById('confusionMatrixCanvas')?.parentElement.classList.remove('hidden');
+          document.getElementById('confusionMatrixCanvas')?.classList.remove('hidden');
           document.getElementById('metricsTable')?.classList.remove('hidden');
           document.getElementById('rocCanvas')?.classList.remove('hidden');
         } else {
