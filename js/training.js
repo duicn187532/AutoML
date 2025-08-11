@@ -627,7 +627,7 @@
           document.getElementById('rocCanvas')?.classList.remove('hidden');
         } else {
           // 回歸時隱藏分類專用圖表
-          document.getElementById('confusionMatrixCanvas')?.parentElement.classList.add('hidden');
+          document.getElementById('confusionMatrixCanvas')?.classList.add('hidden');
           document.getElementById('metricsTable')?.classList.add('hidden');
           document.getElementById('rocCanvas')?.classList.add('hidden');
         }
