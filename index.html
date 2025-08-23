@@ -333,6 +333,9 @@
                 <label>📊 預測資料（.csv）</label>
                 <input type="file" id="predictCsv" accept=".csv" />
                 <button id="predictBtn" disabled>執行預測</button>
+                <label>
+                    <input type="checkbox" id="probToggle"> 輸出完整機率分布
+                </label>                  
                 <div id="predictStatus" class="muted"></div>
                 <div id="predictTable"></div>
                 <button id="downloadPredBtn" disabled style="background:#f39c12;">📥 下載預測結果</button>
