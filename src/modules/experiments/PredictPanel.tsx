@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { downloadBytes, downloadHtmlPredictor, downloadPortableJson, downloadPython, downloadTfjs, experimentCard, predictToCsv } from '@/app/actions';
+import { EChart } from '@/charts/EChart';
+import type { ExplainOutput } from '@/core/workers/types';
+import { downloadBytes, downloadHtmlPredictor, downloadOnnx, explainRow, downloadPortableJson, downloadPython, downloadTfjs, experimentCard, predictToCsv } from '@/app/actions';
 import { useProject } from '@/app/stores/project';
 import type { ExperimentRecord } from '@/core/project/types';
 import { safeFileName } from '@/core/security/escape';
@@ -15,6 +17,8 @@ export function PredictPanel({ exp }: { exp: ExperimentRecord }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Awaited<ReturnType<typeof predictToCsv>> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [explainIdx, setExplainIdx] = useState(1);
+  const [explanation, setExplanation] = useState<ExplainOutput | null>(null);
   if (!model) return null;
   const ds = project.datasets.find((d) => d.id === datasetId);
   const run = async () => {
@@ -53,13 +57,14 @@ export function PredictPanel({ exp }: { exp: ExperimentRecord }) {
       <p className="small muted">{t('predict.hint')}</p>
       <div className="row">
         <strong className="small">{t('export.title')}:</strong>
-        {(['html', 'json', 'card', 'python', 'tfjs'] as const).filter((k) => (k !== 'python' || !['auto', 'dag'].includes(exp.config.pluginId)) && (k !== 'tfjs' || exp.config.pluginId === 'mlp')).map((k) => (
+        {(['html', 'json', 'onnx', 'card', 'python', 'tfjs'] as const).filter((k) => (k !== 'python' || !['auto', 'dag'].includes(exp.config.pluginId)) && (k !== 'tfjs' || exp.config.pluginId === 'mlp')).map((k) => (
           <button key={k} className="link" data-testid={`export-${k}`} onClick={async () => {
             setError(null);
             try {
               if (k === 'html') await downloadHtmlPredictor(exp);
               else if (k === 'json') await downloadPortableJson(exp);
               else if (k === 'tfjs') await downloadTfjs(exp);
+              else if (k === 'onnx') await downloadOnnx(exp);
               else if (k === 'python') downloadPython(exp);
               else downloadBytes(experimentCard(exp), `${safeFileName(exp.name)}-model-card.md`, 'text/markdown');
             } catch (e) { setError((e as Error).message); }
@@ -67,6 +72,23 @@ export function PredictPanel({ exp }: { exp: ExperimentRecord }) {
         ))}
       </div>
       {error && <div className="error-text">{error}</div>}
+      {result && (
+        <div className="row small">
+          {t('explain.row')} <input type="number" min={1} max={result.rows} value={explainIdx} onChange={(e) => setExplainIdx(Number(e.currentTarget.value))} style={{ width: 90 }} />
+          <button className="link" onClick={async () => { setError(null); try { setExplanation(await explainRow(model.id, datasetId, explainIdx - 1)); } catch (e) { setError((e as Error).message); } }} data-testid="explain-run">{t('explain.run')}</button>
+        </div>
+      )}
+      {explanation && (
+        <div data-testid="explanation">
+          <h4>{t('explain.title', { row: explainIdx, pred: String(explanation.prediction) })} · {explanation.method === 'treeshap' ? 'TreeSHAP' : t('explain.perturb')} ({explanation.unit})</h4>
+          <EChart option={{
+            grid: { left: 150, right: 30, top: 10, bottom: 30 }, tooltip: { trigger: 'axis' },
+            xAxis: { type: 'value' },
+            yAxis: { type: 'category', inverse: true, data: explanation.items.slice(0, 15).map((i) => `${i.feature} = ${i.value ?? 'NA'}`), axisLabel: { width: 140, overflow: 'truncate' } },
+            series: [{ type: 'bar', data: explanation.items.slice(0, 15).map((i) => ({ value: +i.contribution.toPrecision(4), itemStyle: { color: i.contribution >= 0 ? '#16a34a' : '#dc2626' } })) }],
+          }} height={Math.min(15, explanation.items.length) * 22 + 50} />
+        </div>
+      )}
       {result && (
         <div className="table-wrap">
           <table className="grid compact">

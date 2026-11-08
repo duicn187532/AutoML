@@ -305,6 +305,15 @@ export interface TrainImageOutput {
 }
 export interface PredictImageInput { artifact: ImageModelArtifact; images: Uint8Array[] }
 
+export interface ExplainInput { table: ColumnarTable; model: Uint8Array; row: number }
+export interface ExplainOutput {
+  method: 'treeshap' | 'perturbation';
+  unit: string;
+  prediction: string | number;
+  baseValue: number;
+  items: { feature: string; value: string | null; contribution: number }[];
+}
+
 /** Map of task kinds → [input, output]. */
 export interface TaskMap {
   parseCsv: [ParseCsvInput, ParseCsvOutput];
@@ -313,6 +322,7 @@ export interface TaskMap {
   benchmark: [BenchmarkInput, BenchmarkOutput];
   auto: [AutoInput, AutoOutput];
   predict: [PredictInput, PredictOutput];
+  explain: [ExplainInput, ExplainOutput];
   pyRun: [PyRunInput, PyRunOutput];
   trainGraph: [TrainGraphInput, TrainGraphOutput];
   unsupervised: [UnsupervisedInput, UnsupervisedOutput];

@@ -23,6 +23,19 @@ function amlStr(v) {
   return s === '' || /^(NA|N\/A|NaN|nan|NULL|null|None|none|#N\/A|\?)$/.test(s) ? null : s;
 }
 
+function amlTokens(text) {
+  var out = [], re = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+|[\p{L}\p{N}]{2,}/gu, m;
+  text = text.toLowerCase();
+  while ((m = re.exec(text))) {
+    var w = m[0];
+    if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(w)) {
+      if (w.length === 1) out.push(w);
+      for (var i = 0; i + 1 < w.length; i++) out.push(w.slice(i, i + 2));
+    } else out.push(w);
+  }
+  return out;
+}
+
 /** Replay a fitted PreprocessorState on one raw row ({ column: value }). */
 export function amlTransform(prep, row) {
   var out = [];
@@ -49,6 +62,14 @@ export function amlTransform(prep, row) {
       var kt = amlStr(raw); if (kt === null) kt = '__missing__';
       var te = s.table[kt] || s.prior;
       for (var q = 0; q < s.outputs; q++) out.push(te[q]);
+    } else if (s.type === 'tfidf') {
+      var vec = s.vocab.map(function () { return 0; }), txt = amlStr(raw);
+      if (txt !== null) {
+        amlTokens(txt).forEach(function (tok) { var ix = s.vocab.indexOf(tok); if (ix >= 0) vec[ix] += s.idf[ix]; });
+        var nn = Math.sqrt(vec.reduce(function (a, v) { return a + v * v; }, 0));
+        if (nn > 0) vec = vec.map(function (v) { return v / nn; });
+      }
+      for (var vi = 0; vi < vec.length; vi++) out.push(vec[vi]);
     } else if (s.type === 'datetime') {
       var ds = amlStr(raw), t = ds === null ? NaN : Date.parse(ds.replace(/\//g, '-'));
       var d = new Date(t), parts = isNaN(t) ? null : [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCDay()];
@@ -64,7 +85,8 @@ function amlLeaf(tree, x, rule) {
     var leaf = tree.leaf ? tree.leaf[i] : tree.left[i] === -1;
     if (leaf) return tree.value[i];
     var f = tree.feature[i], v = x[f];
-    i = (rule === 'lt' ? v < tree.threshold[i] : v <= tree.threshold[i]) ? tree.left[i] : tree.right[i];
+    // XGBoost compares float32(feature) < float32(threshold)
+    i = (rule === 'lt' ? Math.fround(v) < Math.fround(tree.threshold[i]) : v <= tree.threshold[i]) ? tree.left[i] : tree.right[i];
   }
   throw new Error('tree walk did not terminate');
 }
@@ -117,9 +139,8 @@ export function amlEvalModel(m, x, nClasses) {
   if (m.bestIteration !== null && m.bestIteration !== undefined) nTrees = Math.min(nTrees, (m.bestIteration + (m.kind === 'xgboost' ? 1 : 0)) * per);
   for (i = 0; i < nTrees; i++) margin[m.treeClass[i] % per] += amlLeaf(m.trees[i], x, m.kind === 'xgboost' ? 'lt' : 'le')[0];
   if (m.kind === 'xgboost') {
-    var bs = m.baseScore;
-    var logistic = /logistic/.test(m.objective);
-    for (i = 0; i < per; i++) margin[i] += logistic ? Math.log(bs / (1 - bs)) : bs;
+    var bsv = [].concat(m.baseScore), logistic = /logistic/.test(m.objective);
+    for (i = 0; i < per; i++) { var bs = bsv.length === per ? bsv[i] : bsv[0]; margin[i] += logistic ? Math.log(bs / (1 - bs)) : bs; }
   }
   if (!m.classifier) return margin[0];
   out = per === 1 ? [1 - amlSigmoid(margin[0]), amlSigmoid(margin[0])] : amlSoftmax(margin);

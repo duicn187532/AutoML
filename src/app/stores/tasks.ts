@@ -3,6 +3,7 @@ import type { TaskSnapshot } from '@/core/workers/pool';
 import { pool } from '../services';
 
 interface TaskState {
+  paused: boolean;
   tasks: TaskSnapshot[];
   /** Live learning-curve points per task id. */
   points: Record<string, Record<string, number>[]>;
@@ -11,6 +12,7 @@ interface TaskState {
 }
 
 export const useTasks = create<TaskState>((set) => ({
+  paused: false,
   tasks: [],
   points: {},
   addPoint: (id, p) => set((s) => ({ points: { ...s.points, [id]: [...(s.points[id] ?? []), p] } })),
@@ -31,3 +33,5 @@ pool.subscribe((snap) => {
     return { tasks };
   });
 });
+
+pool.onPause((paused) => useTasks.setState({ paused }));

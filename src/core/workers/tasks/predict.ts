@@ -4,7 +4,8 @@ import { transform, type PreprocessorState, type TargetState } from '../../ml/pr
 import { getPlugin } from '../../models/registry';
 import type { ModelArtifact } from '../../models/types';
 import { decodeBinJson } from '../../storage/binjson';
-import type { BaggedMember, PredictInput, PredictOutput, TaskContext } from '../types';
+import type { BaggedMember, ExplainInput, ExplainOutput, PredictInput, PredictOutput, TaskContext } from '../types';
+import type { PyHandle } from '../../engines/adapters';
 
 interface SingleBlob { artifact: ModelArtifact; preprocessor: PreprocessorState; target: TargetState }
 interface EnsembleBlob { kind: 'bagged-ensemble'; task: string; target: TargetState; members: BaggedMember[] }
@@ -63,4 +64,53 @@ export async function predictTask(input: PredictInput, ctx: TaskContext): Promis
     proba.push(row);
   }
   return { task: target.task, prediction: labels, proba, classes: target.classes, ids };
+}
+
+/**
+ * Explain one row. XGBoost / LightGBM single models: TreeSHAP (exact, in margin units, encoded
+ * columns summed back to raw columns). Everything else: per-feature replacement with the training
+ * baseline (median / most frequent) — change in the predicted-class probability or value.
+ */
+export async function explainTask(input: ExplainInput, ctx: TaskContext): Promise<ExplainOutput> {
+  const blob = decodeBinJson<SingleBlob | EnsembleBlob>(input.model);
+  const row = { rowCount: 1, columns: input.table.columns.map((c) => c.kind === 'numeric' ? { ...c, values: Float64Array.of(c.values[input.row]) } : { ...c, values: [c.values[input.row]] }) } as typeof input.table;
+  const sub: PredictInput = { table: row, model: input.model };
+  const base = await predictTask(sub, ctx);
+  const isCls = blob.target.task !== 'regression';
+  const cls = isCls ? (base.proba![0].indexOf(Math.max(...base.proba![0]))) : -1;
+  const score = (o: PredictOutput) => (isCls ? o.proba![0][cls] : Number(o.prediction[0]));
+  const prediction = base.prediction[0];
+  if (!('kind' in blob) && blob.artifact.binary?.pickle && ['xgboost', 'lightgbm'].includes(blob.artifact.pluginId)) {
+    const h = ctx.engine<PyHandle>('pyodide');
+    const id = h.bridge.load(blob.artifact.binary.pickle);
+    try {
+      const X = transform(blob.preprocessor, row);
+      const raw = h.bridge.contributions(id, X.data, 1, X.cols);
+      if (raw) {
+        const r = JSON.parse(raw) as { shape: number[]; values: number[] };
+        // shape [1, cols+1] or [1, classes, cols+1]
+        const width = X.cols + 1;
+        const offset = r.shape.length === 3 ? cls * width : 0;
+        const contrib = r.values.slice(offset, offset + width);
+        const byCol = new Map<string, number>();
+        let k = 0;
+        for (const st of blob.preprocessor.steps) {
+          const n = blob.preprocessor.outputNames.filter((nm) => nm === st.column || nm.startsWith(`${st.column}=`) || nm.startsWith(`${st.column}.`) || nm.startsWith(`${st.column}#`) || nm.startsWith(`${st.column}~`) || nm === `${st.column}__isna`).length;
+          byCol.set(st.column, contrib.slice(k, k + n).reduce((a, b) => a + b, 0));
+          k += n;
+        }
+        return { method: 'treeshap', unit: isCls ? 'margin (log-odds)' : 'standardised target', prediction, baseValue: contrib[width - 1],
+          items: [...byCol.entries()].map(([feature, contribution]) => ({ feature, value: cellString(getColumn(row, feature), 0), contribution })).sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)) };
+      }
+    } finally { h.bridge.free(id); }
+  }
+  const prep = 'kind' in blob ? blob.members[0].folds[0].preprocessor : blob.preprocessor;
+  const items: ExplainOutput['items'] = [];
+  for (const st of prep.steps) {
+    const baseline = st.type === 'numeric' ? String(st.fill) : st.type === 'onehot' || st.type === 'ordinal' ? st.categories[0] : null;
+    const alt = { ...row, columns: row.columns.map((c) => c.name !== st.column ? c : c.kind === 'numeric' ? { ...c, values: Float64Array.of(baseline === null ? NaN : Number(baseline)) } : { ...c, values: [baseline] }) } as typeof row;
+    const o = await predictTask({ table: alt, model: input.model }, ctx);
+    items.push({ feature: st.column, value: cellString(getColumn(row, st.column), 0), contribution: score(base) - score(o) });
+  }
+  return { method: 'perturbation', unit: isCls ? `probability of "${prediction}"` : 'target units', prediction, baseValue: score(base), items: items.sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution)) };
 }

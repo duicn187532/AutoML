@@ -169,7 +169,8 @@ def _xgb(m):
         })
     info = gb.get("tree_info", [0] * len(trees))
     base = learner["learner_model_param"]["base_score"]
-    base = float(base.strip("[]").split(",")[0]) if isinstance(base, str) else float(base)
+    # XGBoost ≥ 3 stores a vector (per-class intercepts, margin space for softprob); 2.x a scalar
+    base = [float(v) for v in base.strip("[]").split(",")] if isinstance(base, str) else [float(base)]
     best = getattr(m, "best_iteration", None)
     return {"trees": trees, "treeClass": info, "baseScore": base, "objective": learner["objective"]["name"], "bestIteration": best}
 

@@ -1,6 +1,6 @@
 import type { TaskContext, TaskKindName, TaskMap } from '../types';
 import { autoTask } from './auto';
-import { predictTask } from './predict';
+import { explainTask, predictTask } from './predict';
 import { pyRunTask } from './pyRun';
 import { trainGraphTask } from './trainGraph';
 import { exportPortableTask } from './exportPortable';
@@ -23,6 +23,7 @@ export const TASK_HANDLERS: { [K in TaskKindName]: Handler<K> } = {
   benchmark: benchmarkTask,
   auto: autoTask,
   predict: predictTask,
+  explain: explainTask,
   pyRun: pyRunTask,
   trainGraph: trainGraphTask,
   exportPortable: exportPortableTask,

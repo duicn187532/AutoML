@@ -46,6 +46,7 @@ function mlpToPortable(a: ModelArtifact) {
 function featuresOf(prep: PreprocessorState): PortableBundle['features'] {
   return prep.steps.map((st) => st.type === 'numeric' ? { name: st.column, kind: 'numeric' as const }
     : st.type === 'datetime' ? { name: st.column, kind: 'datetime' as const }
+    : st.type === 'tfidf' ? { name: st.column, kind: 'categorical' as const }
     : { name: st.column, kind: 'categorical' as const, categories: st.type === 'onehot' || st.type === 'ordinal' ? st.categories.filter((c) => c !== '__missing__') : st.type === 'target' ? Object.keys(st.table).filter((c) => c !== '__missing__') : undefined });
 }
 

@@ -140,7 +140,7 @@ export function LibraryModule() {
 }
 
 const defaultFeatures = (d: DatasetRecord, target: string) =>
-  d.columns.filter((c) => c.name !== target && c.kind !== 'id' && c.kind !== 'text').map((c) => c.name);
+  d.columns.filter((c) => c.name !== target && c.kind !== 'id').map((c) => c.name);
 
 function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: ColumnarTable }) {
   const t = useT();

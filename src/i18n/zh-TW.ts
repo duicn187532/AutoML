@@ -130,7 +130,7 @@ export const zhTW = {
   'quality.missing': '「{col}」缺值 {pct}%：訓練時以訓練集中位數補值並加缺值指示欄',
   'quality.constant': '「{col}」是常數欄，訓練時略過',
   'quality.idLike': '「{col}」看起來是 ID，預設不當特徵',
-  'quality.textColumn': '「{col}」是長文字，表格模型略過（之後可用文字 embedding）',
+  'quality.textColumn': '「{col}」是長文字：訓練時轉成 TF-IDF 特徵（訓練集詞彙前 200）',
   'quality.highCardinality': '「{col}」有 {n} 種類別（高基數），建議改用 target / hash encoding',
   'quality.imbalance': '目標「{col}」類別不平衡（最少 / 最多 = {score}）；請看 macro F1 / AUC',
   'quality.duplicates': '有 {n} 筆完全重複的列',
@@ -401,6 +401,13 @@ export const zhTW = {
   'img.latency': '推論延遲',
   'img.try': '用最新模型預測新影像',
   'img.noBackbone': '此建置沒有預訓練 backbone（執行 scripts/fetch-models.mjs 後重新建置）。',
+  'explain.row': '解釋第幾列',
+  'explain.run': '單筆預測解釋',
+  'explain.title': '第 {row} 列 → {pred}',
+  'explain.perturb': '特徵替換法',
+  'task.pause': '暫停佇列',
+  'task.resume': '繼續佇列',
+  'export.onnx': 'ONNX',
 } as const;
 
 export type MessageKey = keyof typeof zhTW;

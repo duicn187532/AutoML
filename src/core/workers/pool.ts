@@ -78,6 +78,14 @@ export class WorkerPool {
   private queue: Job[] = [];
   private jobs = new Map<string, Job>();
   private listeners = new Set<(s: TaskSnapshot) => void>();
+  private paused = false;
+  private pauseListeners = new Set<(p: boolean) => void>();
+
+  /** Stop starting queued tasks (running ones continue). */
+  pause(): void { this.paused = true; this.pauseListeners.forEach((l) => l(true)); }
+  resume(): void { this.paused = false; this.pauseListeners.forEach((l) => l(false)); this.pump(); }
+  isPaused(): boolean { return this.paused; }
+  onPause(fn: (p: boolean) => void): () => void { this.pauseListeners.add(fn); return () => this.pauseListeners.delete(fn); }
 
   constructor(private opts: PoolOptions) {}
 
@@ -185,6 +193,7 @@ export class WorkerPool {
   }
 
   private pump() {
+    if (this.paused) return;
     for (let i = 0; i < this.queue.length; ) {
       const job = this.queue[i];
       const slot = this.slotFor(job);

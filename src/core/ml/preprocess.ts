@@ -17,6 +17,8 @@ export interface PreprocessConfig {
   missingIndicators: boolean;
   /** How categorical columns become numbers. Target encoding is fitted on training rows only (smoothed). */
   categoricalEncoding?: 'onehot' | 'ordinal' | 'target' | 'hash';
+  /** TF-IDF vocabulary size for text columns (top terms by document frequency in train). */
+  textVocab?: number;
   hashBuckets?: number;
 }
 
@@ -35,6 +37,7 @@ export type FeatureStep =
   | { type: 'ordinal'; column: string; categories: string[] }
   | { type: 'hash'; column: string; buckets: number }
   | { type: 'target'; column: string; outputs: number; table: Record<string, number[]>; prior: number[] }
+  | { type: 'tfidf'; column: string; vocab: string[]; idf: number[] }
   | { type: 'datetime'; column: string; parts: ('year' | 'month' | 'day' | 'dow')[]; fill: number[]; center: number[]; scale: number[] };
 
 export interface PreprocessorState {
@@ -121,11 +124,41 @@ export function fitPreprocessor(
       if (!per[0].length) { skipped.push({ column: name, reason: 'unparseable-dates' }); continue; }
       const st = per.map((v) => numericStats(v, config));
       steps.push({ type: 'datetime', column: name, parts: [...DT_PARTS], fill: st.map((s) => s.fill), center: st.map((s) => s.center), scale: st.map((s) => s.scale) });
+    } else if (col.kind === 'text') {
+      const st = fitTfidf(col, name, trainIdx, config.textVocab ?? 200);
+      if (st) steps.push(st); else skipped.push({ column: name, reason: 'empty-vocabulary' });
     } else {
       skipped.push({ column: name, reason: `unsupported-kind:${col.kind}` });
     }
   }
   return { version: 1, config, steps, outputNames: outputNames(steps), skipped };
+}
+
+/** Words (Latin etc.) plus character bigrams for CJK runs, lower-cased. */
+export function tokenize(text: string): string[] {
+  const out: string[] = [];
+  for (const m of text.toLowerCase().matchAll(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+|[\p{L}\p{N}]{2,}/gu)) {
+    const w = m[0];
+    if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(w)) {
+      if (w.length === 1) out.push(w);
+      for (let i = 0; i + 1 < w.length; i++) out.push(w.slice(i, i + 2));
+    } else out.push(w);
+  }
+  return out;
+}
+
+function fitTfidf(col: Column, name: string, trainIdx: ArrayLike<number>, maxVocab: number): FeatureStep | null {
+  const df = new Map<string, number>();
+  let n = 0;
+  for (let i = 0; i < trainIdx.length; i++) {
+    const s = cellString(col, trainIdx[i]);
+    if (s === null) continue;
+    n++;
+    for (const tok of new Set(tokenize(s))) df.set(tok, (df.get(tok) ?? 0) + 1);
+  }
+  const vocab = [...df.entries()].filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, maxVocab).map(([t]) => t);
+  if (!vocab.length) return null;
+  return { type: 'tfidf', column: name, vocab, idf: vocab.map((t) => Math.log((1 + n) / (1 + df.get(t)!)) + 1) };
 }
 
 /** Smoothed target mean per category (m-estimate, m = 10); multiclass → one column per class. */
@@ -164,6 +197,7 @@ function outputNames(steps: FeatureStep[]): string[] {
     } else if (s.type === 'ordinal') out.push(`${s.column}#ord`);
     else if (s.type === 'hash') for (let b = 0; b < s.buckets; b++) out.push(`${s.column}#h${b}`);
     else if (s.type === 'target') for (let j = 0; j < s.outputs; j++) out.push(`${s.column}#te${s.outputs > 1 ? j : ''}`);
+    else if (s.type === 'tfidf') for (const w of s.vocab) out.push(`${s.column}~${w}`);
     else for (const p of s.parts) out.push(`${s.column}.${p}`);
   }
   return out;
@@ -207,6 +241,17 @@ export function transform(state: PreprocessorState, table: ColumnarTable, rowIdx
     } else if (s.type === 'hash') {
       for (let i = 0; i < n; i++) data[i * cols + offset + (hashString(cellString(col, rowIdx ? rowIdx[i] : i) ?? MISSING_TOKEN) % s.buckets)] = 1;
       offset += s.buckets;
+    } else if (s.type === 'tfidf') {
+      const index = new Map(s.vocab.map((w, k) => [w, k]));
+      for (let i = 0; i < n; i++) {
+        const txt = cellString(col, rowIdx ? rowIdx[i] : i);
+        if (txt === null) continue;
+        let norm = 0;
+        for (const tok of tokenize(txt)) { const k = index.get(tok); if (k !== undefined) data[i * cols + offset + k] += s.idf[k]; }
+        for (let k = 0; k < s.vocab.length; k++) norm += data[i * cols + offset + k] ** 2;
+        if (norm > 0) { norm = Math.sqrt(norm); for (let k = 0; k < s.vocab.length; k++) data[i * cols + offset + k] /= norm; }
+      }
+      offset += s.vocab.length;
     } else if (s.type === 'target') {
       for (let i = 0; i < n; i++) {
         const v = s.table[cellString(col, rowIdx ? rowIdx[i] : i) ?? MISSING_TOKEN] ?? s.prior;

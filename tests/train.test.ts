@@ -13,8 +13,11 @@ const regFeatures = ['地段', '屋況', '臥室數', '浴室數', '客廳面積
 
 describe('plugin registry & params', () => {
   it('lists plugins per task and validates params against the schema', () => {
-    expect(listPlugins('regression').map((p) => p.id)).toEqual(['ridge', 'mlp']);
-    expect(listPlugins('multiclass').map((p) => p.id)).toEqual(['logistic', 'mlp']);
+    const reg = listPlugins('regression').map((p) => p.id), cls = listPlugins('multiclass').map((p) => p.id);
+    expect(reg).toEqual(expect.arrayContaining(['ridge', 'mlp', 'xgboost', 'lightgbm', 'random_forest']));
+    expect(reg).not.toContain('logistic');
+    expect(cls).toEqual(expect.arrayContaining(['logistic', 'mlp', 'naive_bayes', 'lda']));
+    expect(cls).not.toContain('ridge');
     const lp = getPlugin('logistic');
     const { params, errors } = validateParams(lp.params, { ...defaultParams(lp), epochs: 1e9, learningRate: 'abc', junk: 1 });
     expect(params.epochs).toBe(5000);

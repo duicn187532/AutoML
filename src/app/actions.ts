@@ -1,6 +1,7 @@
 import { decodeBinJson, encodeBinJson } from '@/core/storage/binjson';
 import { strToU8, zipSync } from 'fflate';
 import { htmlPredictor } from '@/core/export/htmlPredictor';
+import { portableToOnnx } from '@/core/export/onnx';
 import { experimentModelCard } from '@/core/export/modelCard';
 import runtimeSource from '@/core/export/runtime.js?raw';
 import type { PortableBundle } from '@/core/workers/tasks/exportPortable';
@@ -16,7 +17,7 @@ import type { ModelArtifact, ParamValues } from '@/core/models/types';
 import { portfolio, type Preset } from '@/core/auto/portfolio';
 import { newId } from '@/core/util/id';
 import type { TaskHandle } from '@/core/workers/pool';
-import type { AutoOutput, ImageModelArtifact, TrainConfig, TrainGraphOutput, TrainImageInput, TrainImageOutput, TrainOutput } from '@/core/workers/types';
+import type { AutoOutput, ExplainOutput, ImageModelArtifact, TrainConfig, TrainGraphOutput, TrainImageInput, TrainImageOutput, TrainOutput } from '@/core/workers/types';
 import { pool, storage } from './services';
 import { safeFileName } from '@/core/security/escape';
 import { toCsv } from '@/core/data/csv';
@@ -388,4 +389,27 @@ export async function predictImages(modelId: string, files: Blob[]): Promise<{ c
   const engines: EngineName[] = ['tfjs', ...(artifact.backbone === 'scratch' ? [] : [artifact.backbone as EngineName])];
   const r = await pool.submit({ kind: 'predictImage', input: { artifact, images } }, { label: `predict · ${m.name}`, engines }).result;
   return { classes: artifact.classes, proba: r.proba };
+}
+
+export async function explainRow(modelId: string, datasetId: string, row: number): Promise<ExplainOutput> {
+  const store = useProject.getState();
+  const project = store.project!;
+  const model = project.models.find((m) => m.id === modelId)!;
+  const bytes = (await storage.getBlob(project.id, model.blobKey))!;
+  const table = await store.getTable(datasetId);
+  return pool.submit({ kind: 'explain', input: { table, model: bytes, row } }, { label: `explain · row ${row + 1}`, engines: modelEngines(bytes) as EngineName[] }).result;
+}
+
+/** ONNX export (single models): model.onnx expects the encoded features; preprocessing.json describes the encoding. */
+export async function downloadOnnx(exp: ExperimentRecord) {
+  const bundle = await exportPortable(exp);
+  if (bundle.members.length !== 1) throw new Error('ONNX export supports single models (not ensembles) for now');
+  const mem = bundle.members[0];
+  const nClasses = bundle.target.classes?.length ?? 0;
+  const onnx = portableToOnnx(mem.model as never, mem.prep.outputNames.length, nClasses);
+  downloadBytes(zipSync({
+    'model.onnx': onnx,
+    'preprocessing.json': strToU8(JSON.stringify({ preprocessor: mem.prep, target: bundle.target, note: 'Encode rows with this preprocessor (see aml-runtime.js amlTransform) before feeding "features". Regression output is standardised: value * std + mean.' }, null, 1)),
+    'aml-runtime.js': strToU8(runtimeSource),
+  }), `${safeFileName(exp.name)}-onnx.zip`, 'application/zip');
 }

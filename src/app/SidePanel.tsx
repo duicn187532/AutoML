@@ -31,11 +31,12 @@ function DatasetsPanel() {
 
 function TasksPanel() {
   const t = useT();
-  const { tasks, clearFinished } = useTasks();
+  const { tasks, clearFinished, paused } = useTasks();
   return (
     <section className="panel grow">
       <div className="panel-head">
         <h3>{t('panel.tasks')}</h3>
+        <button className="link" onClick={() => (paused ? pool.resume() : pool.pause())} data-testid="queue-pause">{paused ? `▶ ${t('task.resume')}` : `⏸ ${t('task.pause')}`}</button>
         {tasks.some((x) => x.status !== 'running' && x.status !== 'queued') && (
           <button className="link" onClick={clearFinished}>
             {t('task.clear')}

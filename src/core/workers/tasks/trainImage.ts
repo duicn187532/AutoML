@@ -56,7 +56,13 @@ function scratchCnn(tf: Tf, size: number, k: number, seed: number): TF.LayersMod
   return m;
 }
 
-const flatWeights = (m: TF.LayersModel) => m.getWeights().map((w) => ({ shape: w.shape, data: Array.from(w.dataSync()) }));
+/** Weights in LAYER order (getWeights() puts trainable first, so its order changes when layers are frozen). */
+const layerWeights = (m: TF.LayersModel) => m.layers.flatMap((l) => l.getWeights());
+function setLayerWeights(m: TF.LayersModel, ws: TF.Tensor[]) {
+  let k = 0;
+  for (const l of m.layers) { const n = l.getWeights().length; if (n) { l.setWeights(ws.slice(k, k + n)); k += n; } }
+}
+const flatWeights = (m: TF.LayersModel) => layerWeights(m).map((w) => ({ shape: w.shape, data: Array.from(w.dataSync()) }));
 
 /**
  * Image classification. Modes:
@@ -110,10 +116,10 @@ export async function trainImageTask(input: TrainImageInput, ctx: TaskContext): 
         const loss = sum / tr.length;
         history.epoch.push(ep); history.loss.push(loss); history.val_loss.push(vl);
         ctx.progress({ fraction: lo + (1 - lo - 0.05) * (ep / input.epochs), point: { epoch: ep, loss, val_loss: vl } });
-        if (vl < best.loss - 1e-6) { tf.dispose(best.w); best = { loss: vl, w: model.getWeights().map((w) => w.clone()) }; since = 0; }
+        if (vl < best.loss - 1e-6) { tf.dispose(best.w); best = { loss: vl, w: layerWeights(model).map((w) => w.clone()) }; since = 0; }
         else if (input.patience > 0 && ++since >= input.patience) break;
       }
-      if (best.w.length) model.setWeights(best.w);
+      if (best.w.length) setLayerWeights(model, best.w);
     } finally {
       tf.dispose([yv, ...best.w]);
     }
@@ -149,7 +155,7 @@ export async function trainImageTask(input: TrainImageInput, ctx: TaskContext): 
     let model: TF.LayersModel;
     if (input.mode === 'finetune') {
       // keep pristine backbone weights so the shared engine model is restored afterwards
-      restore.push(...bb!.model.getWeights().map((w) => w.clone()));
+      restore.push(...layerWeights(bb!.model).map((w) => w.clone()));
       const weighted = bb!.embed.layers.filter((l) => l.getWeights().length > 0);
       bb!.embed.layers.forEach((l) => { l.trainable = false; });
       weighted.slice(-Math.max(1, input.unfreeze)).forEach((l) => { l.trainable = true; });
@@ -166,16 +172,20 @@ export async function trainImageTask(input: TrainImageInput, ctx: TaskContext): 
       predictValid = () => pv;
       artifact = { kind: 'image', mode: input.mode, backbone: input.mode === 'scratch' ? 'scratch' : input.backbone, size, classes, weights: flatWeights(model), unfreeze: input.unfreeze };
     } finally {
-      if (input.mode === 'finetune') { bb!.model.setWeights(restore); bb!.embed.layers.forEach((l) => { l.trainable = true; }); tf.dispose(restore); }
+      if (input.mode === 'finetune') { bb!.embed.layers.forEach((l) => { l.trainable = true; }); setLayerWeights(bb!.model, restore); tf.dispose(restore); }
     }
   }
   // latency per image (single-image inference, end to end)
-  const tl = performance.now();
   const one = batchTensor(tf, [imgs[va[0] ?? tr[0]]], size, null, rng);
-  const o = (bb ? bb.embed.predict(one) : one) as TF.Tensor;
-  await o.data();
-  tf.dispose([one, o]);
-  const latencyMs = performance.now() - tl;
+  let latencyMs = 0;
+  for (let rep = 0; rep < 3; rep++) { // first call compiles kernels → report the warm latency
+    const tl = performance.now();
+    const o = (bb ? bb.embed.predict(one) : one) as TF.Tensor;
+    await o.data();
+    o.dispose();
+    latencyMs = performance.now() - tl;
+  }
+  one.dispose();
   const P = predictValid();
   const yv = Float64Array.from(va.map((i) => y[i]));
   const res = classificationMetrics(yv, { rows: va.length, cols: k, data: Float64Array.from(P) });
@@ -198,11 +208,11 @@ export async function predictImageTask(input: PredictImageInput, ctx: TaskContex
   if (a.mode === 'head') {
     model = tf.sequential({ layers: [tf.layers.dropout({ rate: 0.2, inputShape: [a.embedDim!] }), tf.layers.dense({ units: a.classes.length, activation: 'softmax' })] });
   } else if (a.mode === 'finetune') {
-    restore = bb!.model.getWeights().map((w) => w.clone());
+    restore = layerWeights(bb!.model).map((w) => w.clone());
     model = tf.model({ inputs: bb!.embed.inputs, outputs: tf.layers.dense({ units: a.classes.length, activation: 'softmax' }).apply(tf.layers.dropout({ rate: 0.2 }).apply(bb!.embed.outputs[0])) as TF.SymbolicTensor });
   } else model = scratchCnn(tf, a.size, a.classes.length, 0);
   const ws = toWeights();
-  model.setWeights(ws);
+  setLayerWeights(model, ws);
   try {
     const x = batchTensor(tf, imgs, a.size, null, rng);
     const feats = a.mode === 'head' ? (bb!.embed.predict(x) as TF.Tensor) : x;
@@ -212,6 +222,6 @@ export async function predictImageTask(input: PredictImageInput, ctx: TaskContex
     return { proba };
   } finally {
     tf.dispose(ws);
-    if (restore.length) { bb!.model.setWeights(restore); tf.dispose(restore); }
+    if (restore.length) { setLayerWeights(bb!.model, restore); tf.dispose(restore); }
   }
 }
