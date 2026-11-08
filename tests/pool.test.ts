@@ -65,4 +65,17 @@ describe('WorkerPool', () => {
     expect(pool.snapshots()[0].status).toBe('failed');
     pool.terminateAll();
   });
+
+  it('engine cap: the worker holding a capped engine also takes jobs needing more engines (no deadlock)', async () => {
+    const loader = { load: async () => ({ manifest: { bootstrap: [], deps: [] }, files: {} }) };
+    const workers: FakeWorker[] = [];
+    const pool = new WorkerPool({ size: 2, createWorker: () => { const w = new FakeWorker(); workers.push(w); return w as unknown as Worker; }, engineLoader: loader as never, engineWorkerCap: { duckdb: 1 } });
+    const a = pool.submit({ kind: 'sleep', input: { steps: 1, stepMs: 5 } }, { label: 'a', engines: ['duckdb'] });
+    await a.result;
+    const b = pool.submit({ kind: 'sleep', input: { steps: 1, stepMs: 5 } }, { label: 'b', engines: ['duckdb', 'transformers'] });
+    const c = pool.submit({ kind: 'sleep', input: { steps: 1, stepMs: 5 } }, { label: 'c', engines: ['duckdb'] });
+    await expect(Promise.race([Promise.all([b.result, c.result]), new Promise((_, rej) => setTimeout(() => rej(new Error('deadlock')), 2000))])).resolves.toBeTruthy();
+    expect(workers.length).toBe(1); // heavy engine never duplicated
+    pool.terminateAll();
+  });
 });

@@ -55,6 +55,15 @@
 - [ ] RNN / LSTM / TCN、小型 Transformer、AE / VAE、GAN、GNN、音訊、RL
 - [ ] TreeSHAP / 單筆預測解釋；推薦（矩陣分解）
 
+## M4 自動模式
+- [x] 自動判斷任務類型（分類 / 迴歸）；影像在影像訓練器中自動比較 backbone（準確率 + 延遲）
+- [x] 驗證策略：≤ 2 萬列 k-fold、以上 hold-out；測試集最後只評估一次
+- [x] Portfolio 預設模型組合、k-fold OOF bagging、Caruana ensemble selection
+- [x] TPE + 非同步 successive halving，時間預算；early stopping 還原最佳權重
+- [x] 品質預設檔、leaderboard（CV ± std、訓練 / 推論時間、大小）、model card、在模型庫打開
+- [~] 時序：自動偵測頻率與季節（ARIMA / ETS / LSTM）；自動產生 lag 特徵於清理步驟手動加入
+- [ ] 文字自動 backbone（需 embedding 模型）
+
 ## M5 架構編輯器
 - [x] 畫布（拖拉、連線、多選、複製貼上、復原 / 重做）；Input / Dense / Dropout / BatchNorm / Activation / Block / Expert / Gate / Merge / Head
 - [x] 即時形狀檢查與參數量、錯誤標紅、超過上限警示
@@ -79,7 +88,20 @@
 - [~] M8：CSV 輸出正確處理 quote（含公式注入防護）
 - [~] M9：單元測試與 scikit-learn 1.9 結果比對；Playwright `file://` 離線 E2E
 
+## M6 實驗管理
+- [x] 超參數範圍 + grid / random / 貝氏（TPE）搜尋；平行座標影響圖
+- [x] 任務佇列：排程、暫停 / 繼續、取消（協作 + 強制）；失敗的實驗可一鍵重跑
+- [x] 即時曲線、實驗紀錄表、多實驗曲線比較、同 seed 重跑驗證、隨專案 .zip 匯出
+
+## M9 測試、文件與發佈
+- [x] 單元測試 55 個（指標對照 scikit-learn；ONNX / JS runtime 對照 14 種模型）
+- [x] Playwright E2E：`file://`、離線，涵蓋六個模組、匯出的 HTML 預測器、專案 .zip
+- [x] 效能 benchmark（M0 腳本可重跑）
+- [x] GitHub Actions：CI（lint / 型別 / 測試 / build / E2E / zip）；tag → Release + Pages
+- [x] README、內建教學、範例資料（Iris、Titanic、House Prices、抵押品）
+- [ ] 授權：維持 AGPL-3.0，待擁有者決定是否改授權
+
 ## 下一步
-1. M4 自動模式：任務判斷、portfolio、OOF bagging、Caruana ensemble、時間預算的超參數搜尋。
-2. M3 剩餘：非監督（分群 / 降維 / 異常偵測）、時間序列、可解釋性（permutation importance、SHAP）、門檻滑桿 / 校準曲線。
-3. M6 實驗管理：超參數範圍 + grid / random / 貝氏搜尋、平行座標圖。
+1. Firefox / Edge / Safari 與實體 GPU 的 M0 實測。
+2. 文字 embedding（可取得模型權重後接 Transformers.js）、影像 / 序列輸入節點進入架構編輯器、多模態範本。
+3. GAN / GNN / 音訊 / 強化學習、推薦（矩陣分解）、不平衡採樣、ONNX 匯出 ensemble。
