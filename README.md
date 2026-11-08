@@ -1,38 +1,65 @@
-# Tabular AutoML (TF.js + ML-bundle) — README
+# AutoML Workbench
 
-一個在瀏覽器就能跑的表格資料 AutoML + 可解釋訓練平台。支援 **CSV 上傳、特徵型別自動判斷、關係係數排序（Pearson/η/Cramér’s V）**、**Auto/預設/自訂**三種建模模式、**TF.js 深度模型**與**傳統 ML（樹/森林/KNN/SVM/NB）**、即時圖表（Loss/Acc/LR/ROC/混淆矩陣/指標表）、**模型與 metadata 輸出入**、以及 **2D Playground** 可視化決策邊界。全程在本機執行、無需伺服器與外傳資料。
+瀏覽器內的 ML / DL 工作台（類似 MATLAB 的 Learner / Experiment Manager / Deep Network Designer），
+**無後端、可離線**：解壓縮後雙擊 `index.html`（`file://`）即可使用，資料不會離開你的電腦。
+同一份建置也可以直接放在 GitHub Pages。
 
----
+> 🚧 重構進行中。目前完成 **M1 基礎架構**與 M0 的 `file://` 驗證，進度見 [`docs/ROADMAP.md`](docs/ROADMAP.md)。
+> 舊版程式碼保留在 [`legacy/`](legacy/) 僅作規格參考。
 
-## 目錄
-- [特色](#特色)
-- [快速開始](#快速開始)
-- [資料需求（CSV）](#資料需求csv)
-- [操作流程](#操作流程)
-- [模型模式與參數](#模型模式與參數)
-- [自訂層（拖拉積木）](#自訂層拖拉積木)
-- [訓練過程與圖表](#訓練過程與圖表)
-- [可解釋性與報告](#可解釋性與報告)
-- [Playground（互動視覺化）](#playground互動視覺化)
-- [模型匯出 / 匯入](#模型匯出--匯入)
-- [客製化](#客製化)
-- [常見問題與除錯](#常見問題與除錯)
-- [限制與建議](#限制與建議)
-- [檔案結構（建議）](#檔案結構建議)
-- [授權](#授權)
+## 模組
 
----
+| 模組 | 狀態 |
+|---|---|
+| 資料準備 | CSV 匯入（UTF-8 / Big5）、型別推斷、欄位摘要、預覽 |
+| 自動模式 | 規劃中（M4） |
+| 模型庫 | 邏輯回歸、Ridge、MLP（TF.js）；schema 產生的參數表單；即時訓練曲線、混淆矩陣、ROC |
+| 架構編輯器 | 規劃中（M5） |
+| 實驗管理 | 實驗紀錄（排序 / 篩選）、曲線比較、以相同 seed 一鍵重跑並驗證重現 |
+| 腳本模式 | 規劃中（M7） |
 
-## 特色
-- **純前端**：TensorFlow.js + 傳統 ML（ml-bundle.js），無需後端。
-- **特徵型別自動判斷**：數值 / 類別；支援 One-Hot 與數值正規化（MinMax / Z-score）。
-- **關係係數一鍵看**：選好目標欄位即顯示各特徵與目標的相關性，並依絕對值排序（Pearson r / η / Cramér’s V）。
-- **三種建模模式**  
-  - Auto：自動嘗試多種 TF.js 與傳統 ML，邊訓練邊釋放較差模型，節省記憶體。  
-  - 預設：卡片式選型，顯示用途/層數/簡介，可展開原理。  
-  - 自訂：拖拉式積木堆層（Dense/Dropout/BatchNorm/Activation/Flatten）。
-- **圖表與度量**：Loss/Val Loss、（分類）Val Acc、學習率曲線、混淆矩陣、ROC & AUC、Precision/Recall/F1、（回歸）MSE/RMSE。
-- **可解釋性輸出**：訓練結束自動生成說明（為何選此模型、特徵選擇依據、重點指標）。
-- **模型與前處理同步**：輸出 `model.json/.bin + metadata.json`；預測時套用一致前處理。
-- **Playground**：2D 決策邊界即時渲染（合成資料/特徵變換），幫助初學者理解模型行為。
-- **記憶體友好**：嚴格 `dispose()` tensor / model；Auto 模式中隨訓練即時釋放非最佳候選。
+專案（資料集、模型、實驗）自動存在瀏覽器 IndexedDB；**正式存檔請用「匯出專案 .zip」**
+（`file://` 頁面的瀏覽器儲存可能被清除）。
+
+## 支援瀏覽器
+
+Chrome / Edge 桌機版（主要支援，已實測 `file://`）。Firefox / Safari 尚未驗證。
+
+## 開發
+
+```bash
+npm install
+npm run dev          # 開發伺服器
+npm test             # 單元測試（Vitest；指標已與 scikit-learn 比對）
+npm run lint && npm run typecheck
+npm run build        # 輸出 dist/：index.html + assets/ + engines/
+npm run e2e          # 以 file:// + 離線模式跑完整流程（Playwright Chromium）
+npm run m0:file-protocol   # M0：瀏覽器在 file:// 下的能力檢查
+```
+
+## 架構重點
+
+- **單一 IIFE bundle**：`file://` 無法載入 ES module，見 [ADR 0001](docs/decisions/0001-file-protocol-loading.md)。
+- **全部計算在 Web Worker**（inline Blob worker + Comlink pool）：進度回報、協作式取消，逾時 `terminate()` 重建。
+- **引擎包**：大型 runtime（TF.js；之後 Pyodide、DuckDB-Wasm、Transformers.js）打包成分塊 base64 classic script，
+  用到才載入、顯示進度、sha256 驗證。
+- **模型 plugin 介面**（`src/core/models/types.ts`）：`fit / predict / predictProba / export / load` + 參數 schema。
+- **可重現**：所有隨機步驟使用有 seed 的 PRNG（`fork(label)` 子串流）；前處理只在訓練資料 fit 且可序列化。
+- **安全**：嚴格 CSP（無 `unsafe-eval`、無遠端主機）；lint 禁止 `innerHTML`；使用者字串一律 escape。
+
+```
+src/
+  app/        外框、狀態（zustand）、服務單例
+  modules/    六個模組畫面
+  core/       與 UI 無關的核心：data / ml / models / workers / engines / storage / project / security
+  charts/     uPlot（即時曲線）、ECharts（分析圖）
+  i18n/       繁中 / 英文
+build/        Vite plugins（file:// 輸出、引擎包）
+samples/      範例資料集
+docs/         路線圖與決策紀錄
+legacy/       舊版（參考用）
+```
+
+## 授權
+
+AGPL-3.0（見 `LICENSE`）。

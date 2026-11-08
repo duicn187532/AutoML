@@ -1,0 +1,47 @@
+{
+  "name": "automl-workbench",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser-only ML/DL workbench (offline, file:// friendly)",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "node scripts/e2e-file-protocol.mjs",
+    "m0:file-protocol": "node scripts/m0/verify-file-protocol.mjs"
+  },
+  "dependencies": {
+    "comlink": "^4.4.2",
+    "echarts": "^6.1.0",
+    "fflate": "^0.8.3",
+    "idb": "^8.0.4",
+    "papaparse": "^5.7.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "uplot": "^1.6.32",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@tensorflow/tfjs": "^4.22.0",
+    "@types/node": "^22.20.5",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "fake-indexeddb": "^6.2.7",
+    "globals": "^17.14.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^7.3.7",
+    "vitest": "4.0"
+  }
+}

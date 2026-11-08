@@ -1,0 +1,244 @@
+import { cellString, getColumn, type Column, type ColumnarTable } from '../data/table';
+import type { Matrix } from './matrix';
+
+/**
+ * Tabular preprocessing. Statistics are fitted on TRAINING ROWS ONLY and stored as plain JSON,
+ * so the exact same transform is replayed at validation / test / prediction / export time.
+ * (The legacy app fitted on the full dataset → validation leakage.)
+ */
+export type TaskKind = 'binary' | 'multiclass' | 'regression';
+
+export interface PreprocessConfig {
+  numericScaling: 'standard' | 'minmax' | 'none';
+  numericImpute: 'median' | 'mean';
+  /** Keep the N most frequent categories (in train); the rest map to an "other" slot. */
+  maxCategories: number;
+  missingIndicators: boolean;
+}
+
+export const DEFAULT_PREPROCESS: PreprocessConfig = {
+  numericScaling: 'standard',
+  numericImpute: 'median',
+  maxCategories: 30,
+  missingIndicators: true,
+};
+
+export type FeatureStep =
+  | { type: 'numeric'; column: string; fill: number; center: number; scale: number; indicator: boolean }
+  | { type: 'onehot'; column: string; categories: string[]; other: boolean }
+  | { type: 'datetime'; column: string; parts: ('year' | 'month' | 'day' | 'dow')[]; fill: number[]; center: number[]; scale: number[] };
+
+export interface PreprocessorState {
+  version: 1;
+  config: PreprocessConfig;
+  steps: FeatureStep[];
+  outputNames: string[];
+  /** Columns that were requested but skipped (unsupported kind / empty). */
+  skipped: { column: string; reason: string }[];
+}
+
+export const MISSING_TOKEN = '__missing__';
+
+function quantileSorted(sorted: number[], q: number): number {
+  if (!sorted.length) return 0;
+  const pos = (sorted.length - 1) * q;
+  const lo = Math.floor(pos), hi = Math.ceil(pos);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (pos - lo);
+}
+
+function numericStats(values: number[], cfg: PreprocessConfig): { fill: number; center: number; scale: number } {
+  if (!values.length) return { fill: 0, center: 0, scale: 1 };
+  const sorted = [...values].sort((a, b) => a - b);
+  const mean = values.reduce((a, b) => a + b, 0) / values.length;
+  const fill = cfg.numericImpute === 'median' ? quantileSorted(sorted, 0.5) : mean;
+  if (cfg.numericScaling === 'none') return { fill, center: 0, scale: 1 };
+  if (cfg.numericScaling === 'minmax') {
+    const min = sorted[0], max = sorted[sorted.length - 1];
+    return { fill, center: min, scale: max - min || 1 };
+  }
+  const variance = values.reduce((a, v) => a + (v - mean) ** 2, 0) / values.length;
+  return { fill, center: mean, scale: Math.sqrt(variance) || 1 };
+}
+
+const DT_PARTS = ['year', 'month', 'day', 'dow'] as const;
+function dateParts(s: string | null): number[] | null {
+  if (s === null) return null;
+  const t = Date.parse(s.replace(/\//g, '-'));
+  if (Number.isNaN(t)) return null;
+  const d = new Date(t);
+  return [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCDay()];
+}
+
+export function fitPreprocessor(
+  table: ColumnarTable,
+  features: string[],
+  trainIdx: ArrayLike<number>,
+  config: PreprocessConfig = DEFAULT_PREPROCESS,
+): PreprocessorState {
+  const steps: FeatureStep[] = [];
+  const skipped: PreprocessorState['skipped'] = [];
+  for (const name of features) {
+    const col = getColumn(table, name);
+    if (col.kind === 'numeric') {
+      const vals: number[] = [];
+      let missing = 0;
+      for (let i = 0; i < trainIdx.length; i++) {
+        const v = col.values[trainIdx[i]];
+        if (Number.isNaN(v)) missing++; else vals.push(v);
+      }
+      if (!vals.length) { skipped.push({ column: name, reason: 'all-missing' }); continue; }
+      steps.push({ type: 'numeric', column: name, ...numericStats(vals, config), indicator: config.missingIndicators && missing > 0 });
+    } else if (col.kind === 'categorical') {
+      const counts = new Map<string, number>();
+      for (let i = 0; i < trainIdx.length; i++) {
+        const v = col.values[trainIdx[i]] ?? MISSING_TOKEN;
+        counts.set(v, (counts.get(v) ?? 0) + 1);
+      }
+      const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
+      if (sorted.length < 2) { skipped.push({ column: name, reason: 'constant' }); continue; }
+      const categories = sorted.slice(0, config.maxCategories).map(([v]) => v);
+      steps.push({ type: 'onehot', column: name, categories, other: true });
+    } else if (col.kind === 'datetime') {
+      const per: number[][] = DT_PARTS.map(() => []);
+      for (let i = 0; i < trainIdx.length; i++) {
+        const p = dateParts(col.values[trainIdx[i]]);
+        if (p) p.forEach((v, k) => per[k].push(v));
+      }
+      if (!per[0].length) { skipped.push({ column: name, reason: 'unparseable-dates' }); continue; }
+      const st = per.map((v) => numericStats(v, config));
+      steps.push({ type: 'datetime', column: name, parts: [...DT_PARTS], fill: st.map((s) => s.fill), center: st.map((s) => s.center), scale: st.map((s) => s.scale) });
+    } else {
+      skipped.push({ column: name, reason: `unsupported-kind:${col.kind}` });
+    }
+  }
+  return { version: 1, config, steps, outputNames: outputNames(steps), skipped };
+}
+
+function outputNames(steps: FeatureStep[]): string[] {
+  const out: string[] = [];
+  for (const s of steps) {
+    if (s.type === 'numeric') {
+      out.push(s.column);
+      if (s.indicator) out.push(`${s.column}__isna`);
+    } else if (s.type === 'onehot') {
+      for (const c of s.categories) out.push(`${s.column}=${c}`);
+      if (s.other) out.push(`${s.column}=__other__`);
+    } else for (const p of s.parts) out.push(`${s.column}.${p}`);
+  }
+  return out;
+}
+
+/** Apply a fitted preprocessor to (a subset of) rows. Unknown categories → "other" slot. */
+export function transform(state: PreprocessorState, table: ColumnarTable, rowIdx?: ArrayLike<number>): Matrix {
+  const n = rowIdx ? rowIdx.length : table.rowCount;
+  const cols = state.outputNames.length;
+  const data = new Float64Array(n * cols);
+  let offset = 0;
+  for (const s of state.steps) {
+    const col: Column = getColumn(table, s.column);
+    if (s.type === 'numeric') {
+      if (col.kind !== 'numeric') throw new Error(`Column ${s.column} is no longer numeric`);
+      for (let i = 0; i < n; i++) {
+        const v = col.values[rowIdx ? rowIdx[i] : i];
+        const miss = Number.isNaN(v);
+        data[i * cols + offset] = ((miss ? s.fill : v) - s.center) / s.scale;
+        if (s.indicator) data[i * cols + offset + 1] = miss ? 1 : 0;
+      }
+      offset += s.indicator ? 2 : 1;
+    } else if (s.type === 'onehot') {
+      const index = new Map(s.categories.map((c, k) => [c, k]));
+      const width = s.categories.length + (s.other ? 1 : 0);
+      for (let i = 0; i < n; i++) {
+        const v = cellString(col, rowIdx ? rowIdx[i] : i) ?? MISSING_TOKEN;
+        const k = index.get(v);
+        if (k !== undefined) data[i * cols + offset + k] = 1;
+        else if (s.other) data[i * cols + offset + s.categories.length] = 1;
+      }
+      offset += width;
+    } else {
+      for (let i = 0; i < n; i++) {
+        const p = dateParts(cellString(col, rowIdx ? rowIdx[i] : i));
+        for (let k = 0; k < s.parts.length; k++) {
+          const v = p ? p[k] : s.fill[k];
+          data[i * cols + offset + k] = (v - s.center[k]) / s.scale[k];
+        }
+      }
+      offset += s.parts.length;
+    }
+  }
+  return { rows: n, cols, data };
+}
+
+/* ---------- target ---------- */
+
+export type TargetState =
+  | { task: 'binary' | 'multiclass'; column: string; classes: string[] }
+  | { task: 'regression'; column: string; mean: number; std: number };
+
+/** Guess the task from the target column (numeric with few distinct integers → classification). */
+export function inferTask(col: Column): TaskKind {
+  const distinct = new Set<string>();
+  let nonMissing = 0, allInt = true;
+  for (let i = 0; i < col.values.length; i++) {
+    const s = cellString(col, i);
+    if (s === null) continue;
+    nonMissing++;
+    if (distinct.size <= 1000) distinct.add(s);
+    if (col.kind === 'numeric' && !Number.isInteger(col.values[i] as number)) allInt = false;
+  }
+  if (col.kind === 'numeric') {
+    if (allInt && distinct.size <= Math.min(20, Math.max(2, nonMissing / 10))) return distinct.size === 2 ? 'binary' : 'multiclass';
+    return 'regression';
+  }
+  return distinct.size === 2 ? 'binary' : 'multiclass';
+}
+
+/** Fit target encoding on training rows (class list is taken from all non-missing rows so every label is known). */
+export function fitTarget(table: ColumnarTable, target: string, task: TaskKind, trainIdx: ArrayLike<number>): TargetState {
+  const col = getColumn(table, target);
+  if (task === 'regression') {
+    if (col.kind !== 'numeric') throw new Error(`Regression target "${target}" must be numeric`);
+    const vals: number[] = [];
+    for (let i = 0; i < trainIdx.length; i++) {
+      const v = col.values[trainIdx[i]];
+      if (!Number.isNaN(v)) vals.push(v);
+    }
+    const mean = vals.reduce((a, b) => a + b, 0) / (vals.length || 1);
+    const std = Math.sqrt(vals.reduce((a, v) => a + (v - mean) ** 2, 0) / (vals.length || 1)) || 1;
+    return { task, column: target, mean, std };
+  }
+  const set = new Set<string>();
+  for (let i = 0; i < col.values.length; i++) {
+    const s = cellString(col, i);
+    if (s !== null) set.add(s);
+  }
+  const classes = [...set].sort((a, b) => {
+    const na = Number(a), nb = Number(b);
+    return Number.isFinite(na) && Number.isFinite(nb) ? na - nb : a < b ? -1 : a > b ? 1 : 0;
+  });
+  if (classes.length < 2) throw new Error(`Target "${target}" has fewer than 2 classes`);
+  return { task: classes.length === 2 ? 'binary' : 'multiclass', column: target, classes };
+}
+
+/** Encode target; returns class indices (classification) or raw values (regression). NaN / -1 = missing. */
+export function encodeTarget(state: TargetState, table: ColumnarTable): Float64Array {
+  const col = getColumn(table, state.column);
+  const out = new Float64Array(table.rowCount);
+  if (state.task === 'regression') {
+    for (let i = 0; i < out.length; i++) out[i] = col.kind === 'numeric' ? col.values[i] : NaN;
+    return out;
+  }
+  const index = new Map(state.classes.map((c, k) => [c, k]));
+  for (let i = 0; i < out.length; i++) {
+    const s = cellString(col, i);
+    out[i] = s === null ? NaN : (index.get(s) ?? NaN);
+  }
+  return out;
+}
+
+/** Row indices whose target is present. */
+export function labelledRows(y: Float64Array): Int32Array {
+  const idx: number[] = [];
+  for (let i = 0; i < y.length; i++) if (!Number.isNaN(y[i])) idx.push(i);
+  return Int32Array.from(idx);
+}
