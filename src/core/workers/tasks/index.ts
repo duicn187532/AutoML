@@ -5,6 +5,8 @@ import { pyRunTask } from './pyRun';
 import { trainGraphTask } from './trainGraph';
 import { exportPortableTask } from './exportPortable';
 import { forecastTask, unsupervisedTask } from './analysis';
+import { importImagesTask } from './images';
+import { predictImageTask, trainImageTask } from './trainImage';
 import { benchmarkTask } from './benchmark';
 import { profileTable } from '../../data/explore';
 import { applyPipeline } from '../../data/ops';
@@ -25,6 +27,9 @@ export const TASK_HANDLERS: { [K in TaskKindName]: Handler<K> } = {
   trainGraph: trainGraphTask,
   exportPortable: exportPortableTask,
   unsupervised: unsupervisedTask,
+  importImages: importImagesTask,
+  trainImage: trainImageTask,
+  predictImage: predictImageTask,
   forecast: forecastTask,
   profile: async ({ table, target }) => profileTable(table, target),
   applyPipeline: async ({ table, steps }) => applyPipeline(table, steps),

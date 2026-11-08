@@ -40,7 +40,7 @@ export interface GraphRecord {
 export interface DatasetRecord {
   id: string;
   name: string;
-  source: { type: 'csv' | 'sample' | 'derived' | 'script'; fileName?: string; bytes?: number };
+  source: { type: 'csv' | 'sample' | 'derived' | 'script' | 'images'; fileName?: string; bytes?: number };
   rowCount: number;
   columns: ColumnProfile[];
   /** blob: encoded ColumnarTable */
@@ -50,6 +50,8 @@ export interface DatasetRecord {
   createdAt: number;
   warnings?: string[];
   derivedFrom?: { datasetId: string; pipelineId: string };
+  /** Image dataset: table has columns `file` and `label`; JPEG bytes live in this blob (binary-JSON ImagePack). */
+  images?: { blobKey: string; count: number };
 }
 
 /** Replayable data-cleaning / feature-engineering steps (applied by core/data/ops.ts). */
@@ -150,6 +152,7 @@ export function emptyProject(id: string, name: string, seed: number, appVersion:
 
 export const datasetBlobKey = (datasetId: string) => `dataset/${datasetId}`;
 export const modelBlobKey = (modelId: string) => `model/${modelId}`;
+export const imagesBlobKey = (datasetId: string) => `images/${datasetId}`;
 
 export function newPipeline(id: string, dataset: Pick<DatasetRecord, 'id' | 'name'>, steps: PipelineStep[]): PipelineRecord {
   return { id, name: `${dataset.name} pipeline`, inputDatasetId: dataset.id, steps, createdAt: Date.now() };

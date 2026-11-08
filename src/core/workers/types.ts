@@ -267,6 +267,44 @@ export interface ForecastOutput {
   durationMs: number;
 }
 
+export interface ImageModelArtifact {
+  kind: 'image';
+  mode: 'head' | 'finetune' | 'scratch';
+  backbone: string;
+  size: number;
+  classes: string[];
+  weights: { shape: number[]; data: number[] }[];
+  embedDim?: number;
+  unfreeze?: number;
+}
+export interface TrainImageInput {
+  pack: import('./tasks/images').ImagePack;
+  labels: (string | null)[];
+  backbone: string;
+  mode: 'head' | 'finetune' | 'scratch';
+  imageSize: number;
+  unfreeze: number;
+  epochs: number;
+  batchSize: number;
+  learningRate: number;
+  patience: number;
+  validFraction: number;
+  seed: number;
+  augment: { flip: boolean; crop: boolean; color: boolean };
+}
+export interface TrainImageOutput {
+  metrics: MetricSet;
+  confusion: number[][];
+  classes: string[];
+  history: Record<string, number[]>;
+  latencyMs: number;
+  nTrain: number;
+  nValid: number;
+  artifact: ImageModelArtifact;
+  durationMs: number;
+}
+export interface PredictImageInput { artifact: ImageModelArtifact; images: Uint8Array[] }
+
 /** Map of task kinds → [input, output]. */
 export interface TaskMap {
   parseCsv: [ParseCsvInput, ParseCsvOutput];
@@ -278,6 +316,9 @@ export interface TaskMap {
   pyRun: [PyRunInput, PyRunOutput];
   trainGraph: [TrainGraphInput, TrainGraphOutput];
   unsupervised: [UnsupervisedInput, UnsupervisedOutput];
+  trainImage: [TrainImageInput, TrainImageOutput];
+  predictImage: [PredictImageInput, { proba: number[][] }];
+  importImages: [{ files: { path: string; bytes: ArrayBuffer }[]; maxSide: number }, { names: string[]; labels: (string | null)[]; data: Uint8Array[]; failed: string[] }];
   forecast: [ForecastInput, ForecastOutput];
   exportPortable: [{ model: Uint8Array }, import('./tasks/exportPortable').PortableBundle];
   profile: [{ table: ColumnarTable; target?: string }, DataProfile];

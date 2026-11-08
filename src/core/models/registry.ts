@@ -31,6 +31,7 @@ for (const p of [logisticPlugin, ridgePlugin, mlpPlugin, ...SKLEARN_DEFS.map(skl
 /** Display name that also covers pseudo-plugins (Auto-mode ensembles). */
 export function pluginName(id: string): ModelPlugin['name'] {
   if (id === 'auto') return { 'zh-TW': 'AutoML ensemble', en: 'AutoML ensemble' };
+  if (id === 'image') return { 'zh-TW': '影像分類', en: 'Image classifier' };
   if (id === 'dag') return { 'zh-TW': '自訂網路架構', en: 'Custom network graph' };
   return plugins.get(id)?.name ?? { 'zh-TW': id, en: id };
 }

@@ -3,6 +3,7 @@ import { contentHash, decodeTable, encodeTable } from '@/core/data/codec';
 import { profileColumn, type ColumnarTable } from '@/core/data/table';
 import {
   datasetBlobKey,
+  imagesBlobKey,
   emptyProject,
   type DatasetRecord,
   type ExperimentRecord,
@@ -14,12 +15,15 @@ import {
 } from '@/core/project/types';
 import { freshSeed } from '@/core/rng';
 import { exportProjectZip, importProjectZip } from '@/core/storage/zip';
+import { decodeBinJson, encodeBinJson } from '@/core/storage/binjson';
+import type { ImagePack } from '@/core/workers/tasks/images';
 import { newId } from '@/core/util/id';
 import { translate, useLocale } from '@/i18n';
 import { APP_VERSION, storage } from '../services';
 
 const LAST_PROJECT = 'lastProjectId';
 const tableCache = new Map<string, ColumnarTable>();
+const imageCache = new Map<string, ImagePack>();
 
 interface ProjectState {
   project: Project | null;
@@ -32,6 +36,9 @@ interface ProjectState {
   upsertPipeline(p: PipelineRecord): void;
   upsertScript(s: ScriptRecord): void;
   upsertGraph(g: GraphRecord): void;
+  /** Create or update an image dataset (labels table + image pack). */
+  saveImageDataset(id: string | null, name: string, pack: ImagePack, labels: (string | null)[]): Promise<DatasetRecord>;
+  getImages(id: string): Promise<ImagePack>;
   removeDataset(id: string): Promise<void>;
   getTable(id: string): Promise<ColumnarTable>;
   recordExperiment(exp: ExperimentRecord, model?: { record: ModelRecord; bytes: Uint8Array }): Promise<void>;
@@ -116,6 +123,42 @@ export const useProject = create<ProjectState>((set, get) => {
         pipelines: q.pipelines.some((x) => x.id === rec.id) ? q.pipelines.map((x) => (x.id === rec.id ? { ...rec, updatedAt: Date.now() } : x)) : [...q.pipelines, rec],
       })),
 
+    async saveImageDataset(id, name, pack, labels) {
+      const p = get().project!;
+      const dsId = id ?? newId('d');
+      const table: ColumnarTable = {
+        rowCount: pack.names.length,
+        columns: [
+          { name: 'file', kind: 'id', values: pack.names.map((n, i) => `${i}:${n}`) },
+          { name: 'label', kind: 'categorical', values: labels },
+        ],
+      };
+      const tbytes = encodeTable(table);
+      const record: DatasetRecord = {
+        id: dsId, name, source: { type: 'images' }, rowCount: table.rowCount, columns: table.columns.map((c) => profileColumn(c)),
+        blobKey: datasetBlobKey(dsId), hash: contentHash(tbytes), createdAt: Date.now(), images: { blobKey: imagesBlobKey(dsId), count: pack.names.length },
+      };
+      await storage.putBlob(p.id, record.blobKey, tbytes);
+      await storage.putBlob(p.id, record.images!.blobKey, encodeBinJson(pack));
+      tableCache.set(dsId, table);
+      imageCache.set(dsId, pack);
+      update((q) => ({ ...q, datasets: q.datasets.some((d) => d.id === dsId) ? q.datasets.map((d) => (d.id === dsId ? { ...record, createdAt: d.createdAt } : d)) : [...q.datasets, record] }));
+      return record;
+    },
+
+    async getImages(id) {
+      const hit = imageCache.get(id);
+      if (hit) return hit;
+      const p = get().project!;
+      const d = p.datasets.find((x) => x.id === id);
+      if (!d?.images) throw new Error('Not an image dataset');
+      const bytes = await storage.getBlob(p.id, d.images.blobKey);
+      if (!bytes) throw new Error('Image data missing from browser storage');
+      const pack = decodeBinJson<ImagePack>(bytes);
+      imageCache.set(id, pack);
+      return pack;
+    },
+
     upsertGraph: (rec) =>
       update((q) => ({ ...q, graphs: (q.graphs ?? []).some((x) => x.id === rec.id) ? q.graphs!.map((x) => (x.id === rec.id ? rec : x)) : [...(q.graphs ?? []), rec] })),
 
@@ -130,7 +173,9 @@ export const useProject = create<ProjectState>((set, get) => {
       const d = p.datasets.find((x) => x.id === id);
       if (!d) return;
       await storage.deleteBlob(p.id, d.blobKey);
+      if (d.images) await storage.deleteBlob(p.id, d.images.blobKey);
       tableCache.delete(id);
+      imageCache.delete(id);
       update((q) => ({ ...q, datasets: q.datasets.filter((x) => x.id !== id) }));
     },
 

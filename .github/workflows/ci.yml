@@ -15,6 +15,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: node scripts/fetch-pyodide.mjs
+      - run: node scripts/fetch-models.mjs
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test

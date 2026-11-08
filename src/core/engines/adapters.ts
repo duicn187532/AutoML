@@ -90,6 +90,34 @@ function pyPackAdapter(): EngineAdapter {
   };
 }
 
+/** Image backbone: a pretrained TF.js layers model plus the layer used as embedding. */
+export interface Backbone {
+  model: import('@tensorflow/tfjs').LayersModel;
+  /** truncated model: image [b, size, size, 3] in [-1, 1] → embedding [b, d] */
+  embed: import('@tensorflow/tfjs').LayersModel;
+  size: number;
+  label: string;
+  featureLayer: string;
+}
+
+function backboneAdapter(): EngineAdapter {
+  return {
+    async init(_scope, { files, meta, engine }) {
+      const tf = engine<typeof import('@tensorflow/tfjs')>('tfjs');
+      const json = JSON.parse(new TextDecoder().decode(files['model.json'])) as { modelTopology: object; weightsManifest: { weights: import('@tensorflow/tfjs').io.WeightsManifestEntry[] }[] };
+      const shards = (meta.shards as string[]).map((p) => files[p]);
+      const total = shards.reduce((a, b) => a + b.byteLength, 0);
+      const weightData = new Uint8Array(total);
+      let off = 0;
+      for (const sh of shards) { weightData.set(sh, off); off += sh.byteLength; }
+      const model = await tf.loadLayersModel(tf.io.fromMemory(json.modelTopology, json.weightsManifest.flatMap((g) => g.weights), weightData.buffer));
+      const featureLayer = String(meta.feature);
+      const embed = tf.model({ inputs: model.inputs, outputs: model.getLayer(featureLayer).output as import('@tensorflow/tfjs').SymbolicTensor });
+      return { model, embed, size: Number(meta.size), label: String(meta.label), featureLayer } satisfies Backbone;
+    },
+  };
+}
+
 export const ENGINE_ADAPTERS: Partial<Record<EngineName, EngineAdapter>> = {
   tfjs: {
     prepare(scope) {
@@ -147,6 +175,9 @@ export const ENGINE_ADAPTERS: Partial<Record<EngineName, EngineAdapter>> = {
       return scope.XLSX;
     },
   },
+  'mobilenet-025': backboneAdapter(),
+  'mobilenet-050': backboneAdapter(),
+  'mobilenet-100': backboneAdapter(),
   'py-sklearn': pyPackAdapter(),
   'py-gbdt': pyPackAdapter(),
   'py-stats': pyPackAdapter(),

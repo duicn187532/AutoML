@@ -16,7 +16,8 @@
     "e2e": "node scripts/e2e-file-protocol.mjs",
     "m0:file-protocol": "node scripts/m0/verify-file-protocol.mjs",
     "m0:benchmark": "node scripts/m0/benchmark.mjs",
-    "fetch:pyodide": "node scripts/fetch-pyodide.mjs"
+    "fetch:pyodide": "node scripts/fetch-pyodide.mjs",
+    "fetch:models": "node scripts/fetch-models.mjs"
   },
   "dependencies": {
     "comlink": "^4.4.2",

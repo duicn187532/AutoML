@@ -3,6 +3,7 @@ import { copyExperimentToScript, downloadPython, searchParams, startTraining, tr
 import type { SearchDim } from '@/core/auto/search';
 import { Leaderboard, ParamInfluence } from '../experiments/Leaderboard';
 import { Forecast } from './Forecast';
+import { ImageTrainer } from './ImageTrainer';
 import { ThresholdPanel } from './Threshold';
 import { Unsupervised } from './Unsupervised';
 import { CLASSIFICATION_METRICS, REGRESSION_METRICS, fmtDuration, fmtMetric } from '@/app/format';
@@ -126,6 +127,7 @@ export function LibraryModule() {
       ))}
     </div>
   );
+  if (dataset.images) return <div className="module"><h1>{t('nav.library')} · {t('img.title')}</h1><ImageTrainer key={dataset.id} dataset={dataset} /></div>;
   if (loaded?.id !== dataset.id) return <div className="module"><h1>{t('nav.library')}</h1>{tabs}</div>;
   return (
     <>

@@ -28,7 +28,8 @@
 
 ## M2 資料準備
 - [x] 匯入 CSV / TSV / Excel / Parquet / JSON / JSONL（Worker 內；Excel 用 SheetJS 引擎包、Parquet 用 hyparquet）
-- [ ] 匯入圖片資料夾、文字、時間序列、圖資料（隨 DL 模型一起做）
+- [x] 匯入圖片資料夾（子資料夾 = 類別，worker 內縮圖存成 JPEG）
+- [ ] 匯入文字資料集、圖資料（節點 + 邊）
 - [x] 型別推斷：數值 / 類別 / 文字 / 日期 / ID，掃描全部資料、NA 字串；可在介面改型別（記錄為步驟）
 - [x] 資料品質報告（警告 / 已自動處理）：缺值、常數欄、類 ID 欄、文字欄、高基數、類別不平衡、重複列、離群值
 - [x] Target leakage 偵測：單一特徵 hold-out 預測力 ≥ 0.98 時警示
@@ -37,13 +38,37 @@
 - [x] 特徵工程：日期展開、數學轉換、交互項、時序 lag / rolling（只用過去）；one-hot / ordinal / target / hash encoding（訓練時）
 - [x] 前處理只在訓練資料 fit，可序列化
 - [x] 切分策略：train / valid / test、分層、k-fold、時間序、群組（含 group k-fold）
-- [ ] 圖片標註工具、資料擴增設定
+- [x] 圖片標註工具：縮圖格、鍵盤 1–9 指定類別、範圍選取、webcam 收集
+- [x] 影像資料擴增：翻轉 / 隨機裁切 / 亮度對比（訓練時）；不平衡採樣：待做
 
 ## M3 模型庫（進行中）
 - [x] Pyodide sklearn：線性（L1/L2/ElasticNet）、決策樹、隨機森林、ExtraTrees、AdaBoost、HistGBDT、SVM、kNN、Naive Bayes、LDA / QDA、高斯過程
 - [x] XGBoost、LightGBM（即時學習曲線、early stopping）
 - [x] 「全部訓練」+ leaderboard（CV 分數 ± 標準差、時間、模型大小）
 - [x] 測試集只在最後評估一次；k-fold CV 平均 ± 標準差；特徵重要性；迴歸「預測 vs 實際」（原始單位）
+
+- [x] 非監督：K-means、GMM、階層式、DBSCAN（輪廓係數）、PCA、t-SNE、Isolation Forest、LOF；UMAP 因 numba 無法在 Pyodide 使用
+- [x] 時間序列：ARIMA、ETS（自動頻率 / 季節）；GBDT + lag 特徵（清理步驟 + 時間序切分）
+- [x] 門檻滑桿、校準曲線（Brier）
+- [x] CNN：遷移學習只練分類頭、部分解凍微調（MobileNet v1 0.25 / 0.5 / 1.0 引擎包）、從零訓練；自動比較 backbone（準確率 + 延遲）
+- [ ] 文字 embedding（Transformers.js：此環境無法連到 Hugging Face 下載模型）→ 先以 TF-IDF 備援
+- [ ] RNN / LSTM / TCN、小型 Transformer、AE / VAE、GAN、GNN、音訊、RL
+- [ ] TreeSHAP / 單筆預測解釋；推薦（矩陣分解）
+
+## M5 架構編輯器
+- [x] 畫布（拖拉、連線、多選、複製貼上、復原 / 重做）；Input / Dense / Dropout / BatchNorm / Activation / Block / Expert / Gate / Merge / Head
+- [x] 即時形狀檢查與參數量、錯誤標紅、超過上限警示
+- [x] Soft gating、Top-k MoE（load-balancing loss）、規則分流；異質 expert 自動兩階段（OOF → 門衛）並在介面說明
+- [x] 門衛視覺化（各 expert 樣本比例 / 平均權重 / 負責樣本特徵）
+- [x] 範本：Wide & Deep、MoE、多任務、ResNet 式分支；JSON 匯入匯出；Keras / PyTorch / TF.js 程式碼
+- [ ] CNN / LSTM / Transformer Block 與多模態範本（需影像 / 序列輸入節點）；載入預訓練模型為節點
+
+## M7 腳本模式
+- [x] cell 式 Pyodide console、matplotlib 圖、aml.load / aml.save_dataset、複製成程式碼、隨專案儲存
+
+## M8 匯出
+- [x] 單檔 HTML 預測器（單筆表單 + 批次 CSV）、模型 JSON + JS runtime、TF.js 模型、Python 腳本、Model card、批次預測 CSV
+- [ ] ONNX 匯出
 
 ## 提前完成的部分（為了驗證 M1 端到端）
 - [~] M2：CSV 匯入（UTF-8 / Big5，Worker 內解析）、全量掃描型別推斷與 NA 字串、欄位摘要

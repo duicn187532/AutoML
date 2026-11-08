@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EngineSpec } from './vite-plugin-engine-pack.ts';
 import { PY_PACK_GROUPS } from './pyodide-packs.mjs';
+import { IMAGE_BACKBONES } from './image-backbones.mjs';
 
 /** Package directory without relying on `exports` exposing package.json (xlsx does not). */
 const pkgDir = (name: string) => join('node_modules', name);
@@ -55,6 +56,19 @@ export function engineSpecs(): EngineSpec[] {
     bootstrap: ['pyodide.asm.mjs', 'pyodide.js'],
     meta: { vbase: PYODIDE_VBASE },
   });
+
+  // Pretrained image backbones (need `node scripts/fetch-models.mjs`)
+  for (const b of IMAGE_BACKBONES) {
+    const dir = join('vendor/models', b.id);
+    if (!existsSync(join(dir, 'model.json'))) { console.warn(`[engines] ${b.id}: not vendored — run \`node scripts/fetch-models.mjs\`. Pack skipped.`); continue; }
+    const model = JSON.parse(readFileSync(join(dir, 'model.json'), 'utf8')) as { weightsManifest: { paths: string[] }[] };
+    const shards = model.weightsManifest.flatMap((g) => g.paths);
+    specs.push({
+      name: b.id, version: '1', bootstrap: [], deps: ['tfjs'],
+      files: [{ path: join(dir, 'model.json'), as: 'model.json', kind: 'json' }, ...shards.map((p) => ({ path: join(dir, p), as: p, kind: 'data' as const }))],
+      meta: { kind: 'image-backbone', label: b.label, size: b.size, feature: b.feature, shards },
+    });
+  }
 
   // Wheel packs (need `node scripts/fetch-pyodide.mjs`); skipped with a warning when not vendored.
   const lock = JSON.parse(readFileSync(join(pyDir, 'pyodide-lock.json'), 'utf8')) as { packages: Record<string, { file_name: string; depends: string[] }> };

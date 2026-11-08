@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
-import { importCsvFile } from '@/app/actions';
+import { importCsvFile, importImages } from '@/app/actions';
+import { ImageLabeler } from './Images';
 import { fmtBytes } from '@/app/format';
 import { useProject } from '@/app/stores/project';
 import { useUi } from '@/app/stores/ui';
@@ -19,6 +20,7 @@ const PREVIEW_ROWS = 50;
 function ImportBar() {
   const t = useT();
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const run = async (fn: () => Promise<{ id: string }>) => {
@@ -50,6 +52,13 @@ function ImportBar() {
           if (f) await run(async () => importCsvFile(f.name, await f.arrayBuffer()));
         }}
       />
+      <button disabled={busy} onClick={() => folderRef.current?.click()} data-testid="img-folder">{t('img.importFolder')}</button>
+      <input ref={folderRef} type="file" hidden multiple {...{ webkitdirectory: '' }} onChange={async (e) => {
+        const files = [...(e.currentTarget.files ?? [])];
+        e.currentTarget.value = '';
+        const root = ((files[0] as File & { webkitRelativePath?: string })?.webkitRelativePath ?? 'images').split('/')[0];
+        if (files.length) await run(() => importImages(files, root));
+      }} />
       <span className="muted small">{t('data.importHint')}</span>
       <div className="spacer" />
       <span className="small muted">{t('data.loadSample')}:</span>
@@ -149,23 +158,24 @@ export function DataModule() {
                 <ul>{dataset.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
               </details>
             ) : null}
-            <div className="tabs" role="tablist">
+            {!dataset.images && <div className="tabs" role="tablist">
               {(['overview', 'explore', 'clean', 'preview'] as Tab[]).map((k) => (
                 <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'tab active' : 'tab'} onClick={() => setTab(k)} data-testid={`tab-${k}`}>
                   {t(`data.tab.${k}` as MessageKey)}
                 </button>
               ))}
-            </div>
+            </div>}
           </div>
-          {tab === 'overview' && (
+          {dataset.images && <ImageLabeler dataset={dataset} />}
+          {!dataset.images && tab === 'overview' && (
             <>
               {profile?.profile ? <QualityReport profile={profile.profile} /> : <div className="card muted small">{profile?.error ?? t('quality.running')}</div>}
               <ColumnsTable dataset={dataset} onSetKind={setKind} />
             </>
           )}
-          {tab === 'explore' && (profile?.profile ? <Explore profile={profile.profile} /> : <div className="card muted small">{t('quality.running')}</div>)}
-          {tab === 'clean' && table && <Clean dataset={dataset} table={table} />}
-          {tab === 'preview' && table && <Preview table={table} />}
+          {!dataset.images && tab === 'explore' && (profile?.profile ? <Explore profile={profile.profile} /> : <div className="card muted small">{t('quality.running')}</div>)}
+          {!dataset.images && tab === 'clean' && table && <Clean dataset={dataset} table={table} />}
+          {!dataset.images && tab === 'preview' && table && <Preview table={table} />}
         </>
       )}
     </div>

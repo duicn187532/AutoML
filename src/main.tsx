@@ -5,12 +5,13 @@ import './styles.css';
 import { App } from './app/App';
 import { useProject } from './app/stores/project';
 import { engineLoader, pool } from './app/services';
+import * as actions from './app/actions';
 import { useLocale } from './i18n';
 
 document.documentElement.lang = useLocale.getState().locale === 'zh-TW' ? 'zh-Hant' : 'en';
 
 // Diagnostics hook for E2E tests (opt-in via URL hash, exposes nothing sensitive).
-if (location.hash.includes('aml-debug')) Object.assign(window, { __aml: { pool, engineLoader } });
+if (location.hash.includes('aml-debug')) Object.assign(window, { __aml: { pool, engineLoader, actions } });
 
 const root = createRoot(document.getElementById('root')!);
 useProject

@@ -16,7 +16,7 @@ import type { ModelArtifact, ParamValues } from '@/core/models/types';
 import { portfolio, type Preset } from '@/core/auto/portfolio';
 import { newId } from '@/core/util/id';
 import type { TaskHandle } from '@/core/workers/pool';
-import type { AutoOutput, TrainConfig, TrainGraphOutput, TrainOutput } from '@/core/workers/types';
+import type { AutoOutput, ImageModelArtifact, TrainConfig, TrainGraphOutput, TrainImageInput, TrainImageOutput, TrainOutput } from '@/core/workers/types';
 import { pool, storage } from './services';
 import { safeFileName } from '@/core/security/escape';
 import { toCsv } from '@/core/data/csv';
@@ -101,7 +101,7 @@ export async function startTraining(config: TrainConfig, opts: { name?: string; 
 
 /** Re-run an experiment with identical config and seed. */
 export function rerunExperiment(exp: ExperimentRecord): Promise<TrainRun> {
-  if (exp.config.pluginId === 'auto' || exp.config.pluginId === 'dag') return Promise.reject(new Error('Re-run this experiment from its own module (Auto / Network designer)'));
+  if (exp.config.pluginId === 'auto' || exp.config.pluginId === 'dag' || exp.config.pluginId === 'image') return Promise.reject(new Error('Re-run this experiment from its own module (Auto / Network designer)'));
   return startTraining(exp.config, { name: `${exp.name}-rerun`, rerunOf: exp.id });
 }
 
@@ -319,4 +319,73 @@ export async function downloadTfjs(exp: ExperimentRecord) {
   const p = blob.artifact.payload as { modelTopology: unknown; weightSpecs: unknown[]; weightsBase64: string };
   const modelJson = { format: 'layers-model', generatedBy: 'AutoML Workbench', convertedBy: null, modelTopology: p.modelTopology, weightsManifest: [{ paths: ['weights.bin'], weights: p.weightSpecs }] };
   downloadBytes(zipSync({ 'model.json': strToU8(JSON.stringify(modelJson)), 'weights.bin': base64ToBytes(p.weightsBase64), 'preprocessing.json': strToU8(JSON.stringify(decodeBinJson<{ preprocessor: unknown; target: unknown }>(bytes), (k, v) => (k === 'artifact' ? undefined : v))) }), `${safeFileName(exp.name)}-tfjs.zip`, 'application/zip');
+}
+
+/** Import image files (folder upload: class = sub-folder name) as an image dataset. */
+export async function importImages(files: File[], name: string, intoDatasetId?: string, forceLabel?: string | null) {
+  const imgs = files.filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|bmp|gif)$/i.test(f.name));
+  if (!imgs.length) throw new Error('No image files found');
+  const payload = await Promise.all(imgs.map(async (f) => ({ path: (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name, bytes: await f.arrayBuffer() })));
+  const out = await pool.submit({ kind: 'importImages', input: { files: payload, maxSide: 256 } }, { label: `images · ${name}`, transfer: payload.map((p) => p.bytes) }).result;
+  const store = useProject.getState();
+  const labels = forceLabel !== undefined ? out.labels.map(() => forceLabel) : out.labels;
+  if (intoDatasetId) {
+    const ds = store.project!.datasets.find((d) => d.id === intoDatasetId)!;
+    const pack = await store.getImages(intoDatasetId);
+    const table = await store.getTable(intoDatasetId);
+    const old = getColumnValues(table, 'label');
+    return store.saveImageDataset(intoDatasetId, ds.name, { names: [...pack.names, ...out.names], data: [...pack.data, ...out.data] }, [...old, ...labels]);
+  }
+  return store.saveImageDataset(null, name, { names: out.names, data: out.data }, labels);
+}
+
+function getColumnValues(table: ColumnarTable, name: string): (string | null)[] {
+  const c = table.columns.find((x) => x.name === name);
+  return c && c.kind !== 'numeric' ? [...c.values] : new Array(table.rowCount).fill(null);
+}
+
+/** Update labels (labeling tool). */
+export async function setImageLabels(datasetId: string, labels: (string | null)[]) {
+  const store = useProject.getState();
+  const ds = store.project!.datasets.find((d) => d.id === datasetId)!;
+  return store.saveImageDataset(datasetId, ds.name, await store.getImages(datasetId), labels);
+}
+
+export type ImageTrainSettings = Omit<TrainImageInput, 'pack' | 'labels'>;
+
+/** Train an image classifier; recorded as an experiment with the image model as artifact. */
+export async function trainImageModel(datasetId: string, s: ImageTrainSettings, onStart?: (id: string) => void): Promise<{ out: TrainImageOutput; expId: string }> {
+  const store = useProject.getState();
+  const project = store.project!;
+  const ds = project.datasets.find((d) => d.id === datasetId)!;
+  const pack = await store.getImages(datasetId);
+  const labels = getColumnValues(await store.getTable(datasetId), 'label');
+  const engines: EngineName[] = ['tfjs', ...(s.mode === 'scratch' ? [] : [s.backbone as EngineName])];
+  const started = Date.now();
+  const h = pool.submit({ kind: 'trainImage', input: { ...s, pack, labels } }, { label: `${s.mode === 'scratch' ? 'CNN' : s.backbone} · ${ds.name}`, engines, onProgress: (p) => { if (p.point) useTasks.getState().addPoint(h.id, p.point); } });
+  onStart?.(h.id);
+  const out = await h.result;
+  const expId = newId('e'), modelId = newId('m');
+  const bytes = encodeBinJson(out.artifact);
+  const params = { mode: s.mode, backbone: s.backbone, epochs: s.epochs, learningRate: s.learningRate, unfreeze: s.unfreeze, imageSize: s.imageSize };
+  const exp: ExperimentRecord = {
+    id: expId, name: `${s.mode === 'scratch' ? 'cnn' : `${s.backbone}-${s.mode}`}-${project.experiments.length + 1}`, status: 'done',
+    config: { datasetId, target: 'label', features: ['image'], task: out.classes.length === 2 ? 'binary' : 'multiclass', pluginId: 'image', params, seed: s.seed, validFraction: s.validFraction, preprocess: DEFAULT_PREPROCESS },
+    datasetHash: ds.hash, task: out.classes.length === 2 ? 'binary' : 'multiclass', metrics: { train: {}, valid: out.metrics }, confusion: out.confusion, classes: out.classes,
+    history: out.history, notes: [`latency ${out.latencyMs.toFixed(1)} ms / image`], nTrain: out.nTrain, nValid: out.nValid, durationMs: out.durationMs, modelId, createdAt: started,
+  };
+  const model: ModelRecord = { id: modelId, name: exp.name, pluginId: 'image', params, task: exp.task!, datasetId, datasetHash: ds.hash, target: 'label', features: ['image'],
+    metrics: out.metrics, blobKey: modelBlobKey(modelId), sizeBytes: bytes.byteLength, experimentId: expId, createdAt: Date.now() };
+  await store.recordExperiment(exp, { record: model, bytes });
+  return { out, expId };
+}
+
+export async function predictImages(modelId: string, files: Blob[]): Promise<{ classes: string[]; proba: number[][] }> {
+  const project = useProject.getState().project!;
+  const m = project.models.find((x) => x.id === modelId)!;
+  const artifact = decodeBinJson<ImageModelArtifact>((await storage.getBlob(project.id, m.blobKey))!);
+  const images = await Promise.all(files.map(async (f) => new Uint8Array(await f.arrayBuffer())));
+  const engines: EngineName[] = ['tfjs', ...(artifact.backbone === 'scratch' ? [] : [artifact.backbone as EngineName])];
+  const r = await pool.submit({ kind: 'predictImage', input: { artifact, images } }, { label: `predict · ${m.name}`, engines }).result;
+  return { classes: artifact.classes, proba: r.proba };
 }
