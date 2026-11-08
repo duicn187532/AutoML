@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-test:
@@ -25,9 +26,9 @@ jobs:
           npm install --no-save playwright
           npx playwright install --with-deps chromium
           npm run e2e
-      - name: Package offline zip
-        run: cd dist && zip -qr ../automl-workbench.zip .
+      # Uploading the folder itself → the downloaded artifact is ONE zip containing index.html
       - uses: actions/upload-artifact@v4
         with:
           name: automl-workbench
-          path: automl-workbench.zip
+          path: dist
+          retention-days: 90

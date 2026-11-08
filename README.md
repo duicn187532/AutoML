@@ -5,6 +5,19 @@
 
 第一次開啟會出現 6 步驟的快速導覽（右上角「教學」可再次開啟）。
 
+## 使用方式（只需要瀏覽器）
+
+不需要安裝 npm、Python 或任何程式；建置由 GitHub 的伺服器自動完成。
+
+1. **下載**（擇一）
+   - **Releases**：到本 repo 右側「Releases」，下載 `automl-workbench-vX.Y.Z.zip`。
+   - **最新建置**：到「Actions」→「CI」→ 最新一筆綠色勾勾的執行 → 頁面下方 Artifacts 的 `automl-workbench`（需登入 GitHub，保留 90 天）。
+2. **解壓縮**：Windows 在 zip 上按右鍵 →「解壓縮全部」；macOS 直接雙擊 zip。請保持資料夾結構（`index.html` 旁邊要有 `assets/`、`engines/`）。
+3. **開啟**：用 Chrome 或 Edge 雙擊 `index.html`。之後完全離線可用。
+4. （選用）**GitHub Pages**：啟用後可直接用網址開啟，不必下載。
+
+> 只用瀏覽器修改程式碼也可以：在 GitHub 網頁上編輯檔案並 commit，CI 會自動測試並產生新的下載檔。
+
 ## 六個模組
 
 | 模組 | 功能 |
@@ -26,7 +39,9 @@
 - 取消正在執行的 Python 訓練會重啟 worker（瀏覽器沒有可中斷 Python 的機制）。
 - 尚未提供：文字 embedding 模型（目前用 TF-IDF）、GAN / GNN / 強化學習 / 音訊、ONNX 匯出 ensemble。見 [ROADMAP](docs/ROADMAP.md)、[ADR 0003](docs/decisions/0003-deferred-items.md)。
 
-## 開發
+## 開發（開發者用；一般使用者不需要）
+
+以下指令由 GitHub Actions 自動執行；只有想在自己電腦上開發時才需要 Node.js。
 
 ```bash
 npm install
@@ -42,7 +57,9 @@ npm run m0:benchmark      # GBDT / TF.js / Pyodide 效能（需先 build）
 scripts/verify-exports/run.sh   # ONNX 與 JS runtime 對照 sklearn / XGBoost / LightGBM 的預測
 ```
 
-推送 `v*` tag 會建置、測試、打包離線 zip 發佈 Release，並部署 GitHub Pages（`.github/workflows/release.yml`）。
+發佈新版本（全部在瀏覽器完成）：GitHub repo →「Releases」→「Draft a new release」→ 輸入新 tag（例如 `v0.1.0`）→ Publish。
+`.github/workflows/release.yml` 會自動建置、測試、把離線 zip 附到該 Release，並部署 GitHub Pages
+（Pages 需先在 Settings → Pages → Source 選「GitHub Actions」）。
 
 ## 架構重點
 

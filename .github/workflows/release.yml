@@ -1,8 +1,9 @@
 name: Release & Pages
 
 on:
-  push:
-    tags: ['v*']
+  # Publishing a release in the GitHub web UI (Releases → Draft a new release) builds and attaches the zip.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -44,7 +45,9 @@ jobs:
           generate_release_notes: true
 
   pages:
+    # Needs Settings → Pages → Source: "GitHub Actions". A failure here does not affect the release zip.
     needs: build
+    continue-on-error: true
     runs-on: ubuntu-latest
     environment:
       name: github-pages
