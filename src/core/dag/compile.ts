@@ -33,8 +33,16 @@ function customLayers(tf: Tf) {
     call(inputs: TF.Tensor | TF.Tensor[]) {
       return tf.tidy(() => {
         const logits = (Array.isArray(inputs) ? inputs[0] : inputs) as TF.Tensor2D;
-        const kth = tf.topk(logits, this.k).values.min(1, true);
-        const masked = tf.where(tf.greaterEqual(logits, kth), logits, tf.fill(logits.shape, -1e9));
+        // top-k selection is piecewise constant: compute the mask with a zero custom gradient
+        // (tf.topk has no gradient in TF.js); gradients flow through the kept logits.
+        const k = this.k;
+        const maskOf = tf.customGrad(((z: TF.Tensor, save: (t: TF.Tensor[]) => void) => {
+          save([z]);
+          const kth = tf.topk(z as TF.Tensor2D, k).values.min(1, true);
+          return { value: tf.cast(tf.greaterEqual(z, kth), 'float32'), gradFunc: (_dy: TF.Tensor, saved: TF.Tensor[]) => tf.zerosLike(saved[0]) };
+        }) as never) as (z: TF.Tensor) => TF.Tensor;
+        const mask = maskOf(logits);
+        const masked = tf.add(tf.mul(logits, mask), tf.mul(tf.sub(1, mask), -1e9));
         return tf.softmax(masked);
       });
     }

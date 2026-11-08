@@ -89,7 +89,8 @@ export function analyze(g: Graph, ctx: AnalyzeContext): Analysis {
   const heads = g.nodes.filter((n) => n.type === 'head');
   if (!inputs.length) errors.push('noInput');
   if (!heads.length) errors.push('noHead');
-  let heterogeneous = false;
+  // any non-neural expert ⇒ two-stage: every expert then outputs predictions (target width)
+  const heterogeneous = g.nodes.some((n) => n.type === 'expert' && String(n.params.model) !== 'neural');
   for (const id of order) {
     const n = g.nodes.find((x) => x.id === id)!;
     const ins = inEdges(g, id);
@@ -121,7 +122,7 @@ export function analyze(g: Graph, ctx: AnalyzeContext): Analysis {
       }
       case 'expert': {
         const i = one();
-        if (String(p.model) !== 'neural') { heterogeneous = true; out = ctx.targetDims[firstHeadTarget(g, id) ?? ''] ?? 1; break; }
+        if (heterogeneous) { out = ctx.targetDims[firstHeadTarget(g, id) ?? ''] ?? 1; break; }
         if (i !== null) { const u = Number(p.units), L = Math.max(1, Number(p.layers)); out = u; params = dense(i, u) + (L - 1) * dense(u, u); }
         break;
       }

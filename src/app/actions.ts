@@ -1,16 +1,22 @@
-import { encodeBinJson } from '@/core/storage/binjson';
-import { modelBlobKey, type ExperimentRecord, type ModelRecord } from '@/core/project/types';
-import { getPlugin, listPlugins } from '@/core/models/registry';
+import { decodeBinJson, encodeBinJson } from '@/core/storage/binjson';
+import { strToU8, zipSync } from 'fflate';
+import { htmlPredictor } from '@/core/export/htmlPredictor';
+import { experimentModelCard } from '@/core/export/modelCard';
+import runtimeSource from '@/core/export/runtime.js?raw';
+import type { PortableBundle } from '@/core/workers/tasks/exportPortable';
+import { base64ToBytes } from '@/core/util/base64';
+import { modelBlobKey, type ExperimentRecord, type GraphRecord, type ModelRecord } from '@/core/project/types';
+import { getPlugin, listPlugins, pluginName } from '@/core/models/registry';
 import { defaultParams } from '@/core/models/params';
 import { DEFAULT_PREPROCESS, type TaskKind } from '@/core/ml/preprocess';
 import { autoModelCard } from '@/core/auto/modelCard';
 import { gridConfigs, randomConfig, tpeConfig, type SearchDim } from '@/core/auto/search';
 import { Rng } from '@/core/rng';
-import type { ParamValues } from '@/core/models/types';
+import type { ModelArtifact, ParamValues } from '@/core/models/types';
 import { portfolio, type Preset } from '@/core/auto/portfolio';
 import { newId } from '@/core/util/id';
 import type { TaskHandle } from '@/core/workers/pool';
-import type { AutoOutput, TrainConfig, TrainOutput } from '@/core/workers/types';
+import type { AutoOutput, TrainConfig, TrainGraphOutput, TrainOutput } from '@/core/workers/types';
 import { pool, storage } from './services';
 import { safeFileName } from '@/core/security/escape';
 import { toCsv } from '@/core/data/csv';
@@ -95,7 +101,7 @@ export async function startTraining(config: TrainConfig, opts: { name?: string; 
 
 /** Re-run an experiment with identical config and seed. */
 export function rerunExperiment(exp: ExperimentRecord): Promise<TrainRun> {
-  if (exp.config.pluginId === 'auto') return Promise.reject(new Error('Re-run Auto-mode runs from the Auto module'));
+  if (exp.config.pluginId === 'auto' || exp.config.pluginId === 'dag') return Promise.reject(new Error('Re-run this experiment from its own module (Auto / Network designer)'));
   return startTraining(exp.config, { name: `${exp.name}-rerun`, rerunOf: exp.id });
 }
 
@@ -239,4 +245,78 @@ export function downloadPython(exp: ExperimentRecord): void {
   const ds = project.datasets.find((d) => d.id === exp.config.datasetId);
   if (!ds) throw new Error('Dataset not found');
   downloadBytes(experimentToPython(exp, ds, 'standalone'), `${safeFileName(exp.name)}.py`, 'text/x-python');
+}
+
+/** Train a network-designer graph (end-to-end or two-stage) and record it as an experiment. */
+export async function trainGraph(rec: GraphRecord, datasetId: string, features: string[],
+  s: { epochs: number; batchSize: number; learningRate: number; patience: number; validFraction: number; seed: number },
+  mode: 'end-to-end' | 'two-stage', onStart: (id: string) => void): Promise<TrainGraphOutput> {
+  const store = useProject.getState();
+  const project = store.project!;
+  const dataset = project.datasets.find((d) => d.id === datasetId)!;
+  const table = await store.getTable(datasetId);
+  const expertPlugins = rec.graph.nodes.filter((n) => n.type === 'expert' && n.params.model !== 'neural').map((n) => String(n.params.model));
+  const engines: EngineName[] = ['tfjs', ...(mode === 'two-stage' ? [...new Set(expertPlugins.flatMap((p) => getPlugin(p).engines))] : [])];
+  const started = Date.now();
+  const h = pool.submit({ kind: 'trainGraph', input: { table, graph: rec.graph, features, seed: s.seed, validFraction: s.validFraction, epochs: s.epochs, batchSize: s.batchSize, learningRate: s.learningRate, patience: s.patience } },
+    { label: `${rec.name} · ${dataset.name}`, engines, onProgress: (p) => { if (p.point) useTasks.getState().addPoint(h.id, p.point); } });
+  onStart(h.id);
+  const out = await h.result;
+  const head = out.heads[0];
+  const expId = newId('e'), modelId = newId('m');
+  const bytes = encodeBinJson(out.artifact);
+  const exp: ExperimentRecord = {
+    id: expId, name: `${rec.name}-${project.experiments.length + 1}`, status: 'done',
+    config: { datasetId, target: head.target, features, task: head.task, pluginId: 'dag', params: { graphId: rec.id, ...s }, seed: s.seed, validFraction: s.validFraction, preprocess: DEFAULT_PREPROCESS },
+    datasetHash: dataset.hash, task: head.task, metrics: { train: {}, valid: out.metrics[head.node] ?? {} }, classes: head.classes,
+    history: out.history, notes: out.notes, nTrain: out.nTrain, nValid: out.nValid, durationMs: out.durationMs, modelId, createdAt: started,
+  };
+  const model: ModelRecord = { id: modelId, name: exp.name, pluginId: 'dag', params: exp.config.params, task: head.task, datasetId, datasetHash: dataset.hash, target: head.target, features,
+    metrics: exp.metrics!.valid, blobKey: modelBlobKey(modelId), sizeBytes: bytes.byteLength, experimentId: expId, createdAt: Date.now() };
+  await store.recordExperiment(exp, { record: model, bytes });
+  return out;
+}
+
+async function modelBytes(exp: ExperimentRecord) {
+  const project = useProject.getState().project!;
+  const model = project.models.find((m) => m.id === exp.modelId);
+  if (!model) throw new Error('This experiment has no stored model');
+  const bytes = await storage.getBlob(project.id, model.blobKey);
+  if (!bytes) throw new Error('Model data missing from browser storage');
+  return { model, bytes };
+}
+
+/** M8: portable bundle (JSON) — the input to the HTML predictor and the embeddable JS runtime. */
+export async function exportPortable(exp: ExperimentRecord): Promise<PortableBundle> {
+  const { model, bytes } = await modelBytes(exp);
+  return pool.submit({ kind: 'exportPortable', input: { model: bytes } }, { label: `export · ${model.name}`, engines: modelEngines(bytes) as EngineName[] }).result;
+}
+
+export function experimentCard(exp: ExperimentRecord): string {
+  const project = useProject.getState().project!;
+  return experimentModelCard(exp, project.datasets.find((d) => d.id === exp.config.datasetId), pluginName(exp.config.pluginId).en, project.name);
+}
+
+export async function downloadHtmlPredictor(exp: ExperimentRecord) {
+  const bundle = await exportPortable(exp);
+  downloadBytes(htmlPredictor(bundle, `${exp.name} — ${exp.config.target}`, experimentCard(exp)), `${safeFileName(exp.name)}-predictor.html`, 'text/html');
+}
+
+export async function downloadPortableJson(exp: ExperimentRecord) {
+  const bundle = await exportPortable(exp);
+  downloadBytes(zipSync({
+    'model.json': strToU8(JSON.stringify(bundle)),
+    'aml-runtime.js': strToU8(runtimeSource),
+    'README.txt': strToU8('import { amlPredict } from "./aml-runtime.js";\nconst bundle = await (await fetch("model.json")).json();\nconsole.log(amlPredict(bundle, { column: value, ... }));\n'),
+  }), `${safeFileName(exp.name)}-model-js.zip`, 'application/zip');
+}
+
+/** TF.js LayersModel format (model.json + weights.bin) for MLP experiments. */
+export async function downloadTfjs(exp: ExperimentRecord) {
+  const { bytes } = await modelBytes(exp);
+  const blob = decodeBinJson<{ artifact: ModelArtifact }>(bytes);
+  if (blob.artifact?.pluginId !== 'mlp') throw new Error('TF.js export is available for MLP models');
+  const p = blob.artifact.payload as { modelTopology: unknown; weightSpecs: unknown[]; weightsBase64: string };
+  const modelJson = { format: 'layers-model', generatedBy: 'AutoML Workbench', convertedBy: null, modelTopology: p.modelTopology, weightsManifest: [{ paths: ['weights.bin'], weights: p.weightSpecs }] };
+  downloadBytes(zipSync({ 'model.json': strToU8(JSON.stringify(modelJson)), 'weights.bin': base64ToBytes(p.weightsBase64), 'preprocessing.json': strToU8(JSON.stringify(decodeBinJson<{ preprocessor: unknown; target: unknown }>(bytes), (k, v) => (k === 'artifact' ? undefined : v))) }), `${safeFileName(exp.name)}-tfjs.zip`, 'application/zip');
 }

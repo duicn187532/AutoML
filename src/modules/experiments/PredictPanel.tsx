@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { downloadBytes, predictToCsv } from '@/app/actions';
+import { downloadBytes, downloadHtmlPredictor, downloadPortableJson, downloadPython, downloadTfjs, experimentCard, predictToCsv } from '@/app/actions';
 import { useProject } from '@/app/stores/project';
 import type { ExperimentRecord } from '@/core/project/types';
 import { safeFileName } from '@/core/security/escape';
-import { useT } from '@/i18n';
+import { useT, type MessageKey } from '@/i18n';
 
 /** Batch prediction with an experiment's stored model on any dataset with the same columns. */
 export function PredictPanel({ exp }: { exp: ExperimentRecord }) {
@@ -51,6 +51,21 @@ export function PredictPanel({ exp }: { exp: ExperimentRecord }) {
         )}
       </div>
       <p className="small muted">{t('predict.hint')}</p>
+      <div className="row">
+        <strong className="small">{t('export.title')}:</strong>
+        {(['html', 'json', 'card', 'python', 'tfjs'] as const).filter((k) => (k !== 'python' || !['auto', 'dag'].includes(exp.config.pluginId)) && (k !== 'tfjs' || exp.config.pluginId === 'mlp')).map((k) => (
+          <button key={k} className="link" data-testid={`export-${k}`} onClick={async () => {
+            setError(null);
+            try {
+              if (k === 'html') await downloadHtmlPredictor(exp);
+              else if (k === 'json') await downloadPortableJson(exp);
+              else if (k === 'tfjs') await downloadTfjs(exp);
+              else if (k === 'python') downloadPython(exp);
+              else downloadBytes(experimentCard(exp), `${safeFileName(exp.name)}-model-card.md`, 'text/markdown');
+            } catch (e) { setError((e as Error).message); }
+          }}>{t(`export.${k}` as MessageKey)}</button>
+        ))}
+      </div>
       {error && <div className="error-text">{error}</div>}
       {result && (
         <div className="table-wrap">

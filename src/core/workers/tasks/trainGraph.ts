@@ -17,9 +17,8 @@ type Tf = typeof TF;
 function weightedLoss(tf: Tf, kind: 'sce' | 'mse', w: number) {
   return (yTrue: TF.Tensor, yPred: TF.Tensor) => tf.tidy(() => {
     if (kind === 'mse') return tf.mul(tf.mean(tf.square(tf.sub(yTrue, yPred))), w);
-    const k = yPred.shape[yPred.shape.length - 1] as number;
-    const onehot = tf.oneHot(tf.cast(tf.reshape(yTrue, [-1]), 'int32'), k);
-    const ll = tf.sum(tf.mul(onehot, tf.log(tf.clipByValue(yPred, 1e-7, 1))), -1);
+    // yTrue is one-hot (TF.js checks custom-loss targets against the output shape)
+    const ll = tf.sum(tf.mul(yTrue, tf.log(tf.clipByValue(yPred, 1e-7, 1))), -1);
     return tf.mul(tf.neg(tf.mean(ll)), w);
   });
 }
@@ -114,7 +113,8 @@ export async function trainGraphTask(input: TrainGraphInput, ctx: TaskContext): 
     const ysFor = (rows: Int32Array) => c.outputs.map((o) => {
       if (o.kind === 'balance') { const E = graph.edges.filter((e) => e.to === o.node && e.port === 'in').length; return tf.zeros([rows.length, E]); }
       const h = headInfo.find((x) => x.id === o.node)!;
-      return yT(h, enc(h, rows));
+      const y = enc(h, rows);
+      return h.task === 'regression' ? yT(h, y) : tf.oneHot(tf.tensor1d(Int32Array.from(y), 'int32'), targetDims[h.col]).toFloat();
     });
     const xAll = toT(Xtr), xv = toT(Xva), ysAll = ysFor(trainRows), ysV = ysFor(validRows);
     let best = { loss: Infinity, epoch: 0, w: [] as TF.Tensor[] }, since = 0;

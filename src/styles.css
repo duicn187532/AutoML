@@ -191,3 +191,22 @@ textarea.code:focus { outline: none; box-shadow: inset 2px 0 0 var(--accent); }
 .cell-out pre { margin: 0; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; max-height: 400px; overflow: auto; }
 .cell-out img { max-width: 100%; background: #fff; border-radius: 4px; align-self: flex-start; }
 .ok { color: var(--ok); }
+.dag-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; margin-bottom: 14px; }
+.dag-canvas { width: 100%; height: 560px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); cursor: grab; user-select: none; }
+.dag-node { cursor: move; }
+.dag-title { font-size: 13px; font-weight: 600; fill: var(--text); }
+.dag-sub { font-size: 11px; fill: var(--muted); }
+.dag-shape { font-size: 10px; fill: var(--muted); text-anchor: middle; }
+.dag-edge { cursor: pointer; }
+.port { fill: var(--panel); stroke: var(--muted); stroke-width: 1.5; cursor: crosshair; }
+.port:hover { fill: var(--accent); }
+.port.ctrl { stroke: #db2777; }
+.dag-side { max-height: 560px; overflow: auto; margin: 0; }
+.palette { display: flex; gap: 6px; flex-wrap: wrap; }
+.inspector .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
+.inspector label { font-size: 12px; font-weight: 600; }
+.field-inline { display: flex; flex-direction: column; gap: 2px; }
+.field-inline input { width: 90px; }
+@media (max-width: 1100px) { .dag-layout { grid-template-columns: 1fr; } }
+.module-head { max-width: 1400px; margin-bottom: 10px; }
+.lib-tabs { margin-top: 0; }

@@ -43,6 +43,10 @@ export interface PyBridge {
   dump(id: number): PyBytes;
   load(bytes: Uint8Array): number;
   free(id: number): void;
+  export_portable(id: number): string | undefined;
+  unsupervised(method: string, paramsJson: string, X: Float64Array, rows: number, cols: number, seed: number): string;
+  forecast(method: string, paramsJson: string, y: Float64Array, n: number, horizon: number, holdout: number): string;
+  contributions(id: number, X: Float64Array, rows: number, cols: number): string | undefined;
 }
 export interface PyBytes {
   toJs(): Uint8Array;

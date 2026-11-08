@@ -25,6 +25,16 @@ export interface Project {
   models: ModelRecord[];
   experiments: ExperimentRecord[];
   scripts: ScriptRecord[];
+  /** Network-designer graphs (optional for projects saved by older versions). */
+  graphs?: GraphRecord[];
+}
+
+export interface GraphRecord {
+  id: string;
+  name: string;
+  datasetId?: string;
+  graph: import('../dag/graph').Graph;
+  updatedAt: number;
 }
 
 export interface DatasetRecord {

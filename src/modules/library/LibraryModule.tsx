@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { copyExperimentToScript, downloadPython, searchParams, startTraining, trainAll, type SearchMethod } from '@/app/actions';
 import type { SearchDim } from '@/core/auto/search';
 import { Leaderboard, ParamInfluence } from '../experiments/Leaderboard';
+import { Forecast } from './Forecast';
+import { ThresholdPanel } from './Threshold';
+import { Unsupervised } from './Unsupervised';
 import { CLASSIFICATION_METRICS, REGRESSION_METRICS, fmtDuration, fmtMetric } from '@/app/format';
 import { useProject } from '@/app/stores/project';
 import { useTasks } from '@/app/stores/tasks';
@@ -61,6 +64,7 @@ export function ExperimentResult({ exp }: { exp: ExperimentRecord }) {
           </div>
         ))}
       </div>
+      <ThresholdPanel exp={exp} />
       {exp.skippedColumns?.length ? <p className="small muted">{t('lib.skipped', { cols: exp.skippedColumns.map((s) => `${s.column} (${s.reason})`).join(', ') })}</p> : null}
       {exp.notes?.length ? <p className="small muted">{exp.notes.join(' · ')}</p> : null}
       <div className="chart-grid">
@@ -113,9 +117,24 @@ export function LibraryModule() {
     return () => { alive = false; };
   }, [dataset, getTable]);
 
+  const [mode, setMode] = useState<'supervised' | 'unsupervised' | 'forecast'>('supervised');
   if (!dataset) return <div className="module"><h1>{t('nav.library')}</h1><p className="muted">{t('panel.data.empty')}</p></div>;
-  if (loaded?.id !== dataset.id) return <div className="module"><h1>{t('nav.library')}</h1></div>;
-  return <LibraryForm key={dataset.id} dataset={dataset} table={loaded.table} />;
+  const tabs = (
+    <div className="tabs lib-tabs" role="tablist">
+      {(['supervised', 'unsupervised', 'forecast'] as const).map((k) => (
+        <button key={k} role="tab" aria-selected={mode === k} className={mode === k ? 'tab active' : 'tab'} onClick={() => setMode(k)} data-testid={`lib-tab-${k}`}>{t(`lib.mode.${k}` as MessageKey)}</button>
+      ))}
+    </div>
+  );
+  if (loaded?.id !== dataset.id) return <div className="module"><h1>{t('nav.library')}</h1>{tabs}</div>;
+  return (
+    <>
+      <div className="module-head">{tabs}</div>
+      {mode === 'supervised' && <LibraryForm key={dataset.id} dataset={dataset} table={loaded.table} />}
+      {mode === 'unsupervised' && <div className="module"><Unsupervised key={dataset.id} dataset={dataset} table={loaded.table} /></div>}
+      {mode === 'forecast' && <div className="module"><Forecast key={dataset.id} dataset={dataset} table={loaded.table} /></div>}
+    </>
+  );
 }
 
 const defaultFeatures = (d: DatasetRecord, target: string) =>

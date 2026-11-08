@@ -228,6 +228,45 @@ export interface TrainGraphOutput {
   durationMs: number;
 }
 
+export type UnsupervisedMethod = 'kmeans' | 'dbscan' | 'agglomerative' | 'gmm' | 'pca' | 'tsne' | 'isolation_forest' | 'lof';
+export interface UnsupervisedInput { table: ColumnarTable; features: string[]; method: UnsupervisedMethod; params: Record<string, number | string>; seed: number }
+export interface UnsupervisedOutput {
+  method: UnsupervisedMethod;
+  labels?: number[];
+  nClusters?: number;
+  noise?: number;
+  silhouette?: number;
+  inertia?: number;
+  bic?: number;
+  components?: number[][];
+  explainedVariance?: number[];
+  anomaly?: number[];
+  scores?: number[];
+  /** 2-D projection (row-major n × 2) for plotting */
+  embedding: number[];
+  featureNames: string[];
+  durationMs: number;
+}
+export interface ForecastInput {
+  table: ColumnarTable;
+  timeColumn: string;
+  valueColumn: string;
+  method: 'arima' | 'ets';
+  params: Record<string, number | string>;
+  horizon: number;
+  holdout: number;
+}
+export interface ForecastOutput {
+  frequency: string;
+  season: number;
+  history: { t: string[]; y: number[] };
+  holdout?: { pred: number[]; lo: number[]; hi: number[]; mae: number; rmse: number; mape: number };
+  forecast: { pred: number[]; lo: number[]; hi: number[] };
+  futureT: string[];
+  aic: number;
+  durationMs: number;
+}
+
 /** Map of task kinds → [input, output]. */
 export interface TaskMap {
   parseCsv: [ParseCsvInput, ParseCsvOutput];
@@ -238,6 +277,9 @@ export interface TaskMap {
   predict: [PredictInput, PredictOutput];
   pyRun: [PyRunInput, PyRunOutput];
   trainGraph: [TrainGraphInput, TrainGraphOutput];
+  unsupervised: [UnsupervisedInput, UnsupervisedOutput];
+  forecast: [ForecastInput, ForecastOutput];
+  exportPortable: [{ model: Uint8Array }, import('./tasks/exportPortable').PortableBundle];
   profile: [{ table: ColumnarTable; target?: string }, DataProfile];
   applyPipeline: [{ table: ColumnarTable; steps: PipelineStep[] }, { table: ColumnarTable; log: StepLog[] }];
 }

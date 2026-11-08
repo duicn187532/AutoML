@@ -1,9 +1,9 @@
 import { Component, type ReactNode } from 'react';
 import { AutoModule } from '@/modules/auto/AutoModule';
+import { DagModule } from '@/modules/dag/DagModule';
 import { DataModule } from '@/modules/data/DataModule';
 import { ExperimentsModule } from '@/modules/experiments/ExperimentsModule';
 import { LibraryModule } from '@/modules/library/LibraryModule';
-import { PlannedModule } from '@/modules/planned/PlannedModule';
 import { ScriptModule } from '@/modules/script/ScriptModule';
 import { NavRail } from './NavRail';
 import { SidePanel } from './SidePanel';
@@ -41,7 +41,7 @@ export function App() {
           {module === 'experiments' && <ExperimentsModule />}
           {module === 'auto' && <AutoModule />}
           {module === 'script' && <ScriptModule />}
-          {module === 'dag' && <PlannedModule module={module} />}
+          {module === 'dag' && <DagModule />}
         </ErrorBoundary>
       </main>
       <SidePanel />

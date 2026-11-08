@@ -9,6 +9,7 @@ import {
   type ModelRecord,
   type PipelineRecord,
   type ScriptRecord,
+  type GraphRecord,
   type Project,
 } from '@/core/project/types';
 import { freshSeed } from '@/core/rng';
@@ -30,6 +31,7 @@ interface ProjectState {
   addDataset(table: ColumnarTable, meta: Pick<DatasetRecord, 'name' | 'source' | 'warnings' | 'derivedFrom'>): Promise<DatasetRecord>;
   upsertPipeline(p: PipelineRecord): void;
   upsertScript(s: ScriptRecord): void;
+  upsertGraph(g: GraphRecord): void;
   removeDataset(id: string): Promise<void>;
   getTable(id: string): Promise<ColumnarTable>;
   recordExperiment(exp: ExperimentRecord, model?: { record: ModelRecord; bytes: Uint8Array }): Promise<void>;
@@ -113,6 +115,9 @@ export const useProject = create<ProjectState>((set, get) => {
         ...q,
         pipelines: q.pipelines.some((x) => x.id === rec.id) ? q.pipelines.map((x) => (x.id === rec.id ? { ...rec, updatedAt: Date.now() } : x)) : [...q.pipelines, rec],
       })),
+
+    upsertGraph: (rec) =>
+      update((q) => ({ ...q, graphs: (q.graphs ?? []).some((x) => x.id === rec.id) ? q.graphs!.map((x) => (x.id === rec.id ? rec : x)) : [...(q.graphs ?? []), rec] })),
 
     upsertScript: (rec) =>
       update((q) => ({
