@@ -10,6 +10,7 @@ declare function importScripts(...urls: string[]): void;
 export interface EnginePayload {
   bootstrap: string[];
   files: Record<string, Uint8Array>;
+  meta?: Record<string, unknown>;
 }
 
 const PROGRESS_INTERVAL_MS = 80;
@@ -19,6 +20,8 @@ const YIELD_INTERVAL_MS = 25;
 export function createWorkerApi(scope: typeof globalThis = globalThis) {
   const cancelled = new Set<string>();
   const engines = new Map<EngineName, unknown>();
+  /** All files of all loaded engines (virtual file system for runtimes that fetch their assets). */
+  const vfs = new Map<string, Uint8Array>();
 
   const engine = <T,>(name: EngineName): T => {
     if (!engines.has(name)) throw new Error(`Engine "${name}" not loaded in this worker`);
@@ -33,12 +36,13 @@ export function createWorkerApi(scope: typeof globalThis = globalThis) {
     async loadEngine(name: EngineName, payload: EnginePayload): Promise<void> {
       if (engines.has(name)) return;
       const adapter = ENGINE_ADAPTERS[name];
+      for (const [k, v] of Object.entries(payload.files)) vfs.set(k, v);
       adapter?.prepare?.(scope as never);
       for (const file of payload.bootstrap) {
         const url = URL.createObjectURL(new Blob([payload.files[file] as BlobPart], { type: 'text/javascript' }));
         try { importScripts(url); } finally { URL.revokeObjectURL(url); }
       }
-      engines.set(name, adapter ? await adapter.init(scope as never, payload.files) : true);
+      engines.set(name, adapter ? await adapter.init(scope as never, { files: payload.files, meta: payload.meta ?? {}, vfs, engine }) : true);
     },
 
     /** Test hook: register an already-available engine object (e.g. tfjs imported in Node). */
@@ -73,7 +77,7 @@ export function createWorkerApi(scope: typeof globalThis = globalThis) {
       try {
         const handler = TASK_HANDLERS[spec.kind] as (i: TaskMap[K][0], c: TaskContext) => Promise<TaskMap[K][1]>;
         const result = await handler(spec.input, ctx);
-        if (spec.kind === 'parseCsv') {
+        if (spec.kind === 'parseCsv' || spec.kind === 'applyPipeline') {
           const r = result as TaskMap['parseCsv'][1];
           return transfer(result, tableTransferables(r.table));
         }

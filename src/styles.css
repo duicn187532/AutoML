@@ -153,3 +153,25 @@ td.actions { display: flex; gap: 4px; }
 td.name-cell { white-space: normal; min-width: 120px; }
 td.name-cell .badge { display: inline-block; margin: 2px 0 0; }
 td.dataset-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.tabs { display: flex; gap: 4px; margin-top: 8px; border-bottom: 1px solid var(--border); }
+.tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 12px; color: var(--muted); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.issues { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.issue { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+.issue .badge { margin: 0; }
+.steps { padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.step { display: flex; gap: 10px; align-items: center; }
+.step.error .step-text { color: var(--danger); }
+.step-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.step-form .field { display: flex; flex-direction: column; gap: 4px; }
+.step-form label { font-size: 12px; font-weight: 600; }
+.checks.inline { flex-direction: row; flex-wrap: wrap; gap: 4px 12px; max-height: 120px; }
+.card.inset { background: var(--bg); }
+.metric-std { font-size: 13px; font-weight: 500; color: var(--muted); }
+select.kind { padding: 1px 4px; }
+.presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 10px 0; }
+.preset { border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+.preset input { display: none; }
+.preset.active { border-color: var(--accent); background: var(--accent-soft); }
+.auto-form .row .field { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
+.model-card { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; background: var(--bg); padding: 12px; border-radius: 6px; max-height: 420px; overflow: auto; }

@@ -39,6 +39,8 @@ interface Slot {
   worker: Worker;
   api: Remote<WorkerApi>;
   engines: Set<string>;
+  /** Engines this worker has been assigned to load (counts toward engine caps before loading finishes). */
+  reserved: Set<string>;
   busy: boolean;
   dead: boolean;
 }
@@ -60,6 +62,8 @@ export interface PoolOptions {
   engineLoader?: EngineLoader;
   /** After a cooperative cancel request, terminate the worker if the task has not stopped (ms). */
   hardCancelMs?: number;
+  /** Max number of workers that may hold a heavy engine (e.g. { pyodide: 1 } — each copy costs 0.2–0.5 GB). */
+  engineWorkerCap?: Record<string, number>;
 }
 
 let seq = 0;
@@ -137,7 +141,7 @@ export class WorkerPool {
 
   private spawn(): Slot {
     const worker = this.opts.createWorker();
-    const slot: Slot = { worker, api: wrap<WorkerApi>(worker), engines: new Set(), busy: false, dead: false };
+    const slot: Slot = { worker, api: wrap<WorkerApi>(worker), engines: new Set(), reserved: new Set(), busy: false, dead: false };
     worker.addEventListener('error', (e) => {
       e.preventDefault?.();
       const job = [...this.jobs.values()].find((j) => j.slot === slot && j.snap.status === 'running');
@@ -157,19 +161,38 @@ export class WorkerPool {
     this.slots = this.slots.filter((s) => s !== slot);
   }
 
-  private idleSlot(): Slot | undefined {
-    const idle = this.slots.find((s) => !s.busy && !s.dead);
-    if (idle) return idle;
+  /**
+   * Pick a worker for a job: prefer an idle worker that already has the job's engines loaded;
+   * respect per-engine worker caps (heavy runtimes are not duplicated across workers).
+   */
+  private slotFor(job: Job): Slot | undefined | null {
+    const need = job.opts.engines ?? [];
+    const has = (s: Slot, e: string) => s.engines.has(e) || s.reserved.has(e);
+    const idle = this.slots.filter((s) => !s.busy && !s.dead);
+    const warm = idle.filter((s) => need.every((e) => has(s, e)));
+    if (warm.length) return warm[0];
+    const capped = need.filter((e) => this.opts.engineWorkerCap?.[e] !== undefined);
+    // a worker that already holds the capped (heavy) engines can load whatever else is missing
+    const holder = capped.length ? idle.find((s) => capped.every((e) => has(s, e))) : undefined;
+    if (holder) return holder;
+    const atCap = (e: string) => this.slots.filter((s) => !s.dead && has(s, e)).length >= this.opts.engineWorkerCap![e];
+    // a capped engine already at its cap → must wait for the worker that has it
+    if (capped.some((e) => atCap(e))) return null;
+    const blank = idle.find((s) => !capped.length || !s.engines.size) ?? idle[0];
+    if (blank) return blank;
     if (this.slots.length < this.opts.size) return this.spawn();
     return undefined;
   }
 
   private pump() {
-    while (this.queue.length) {
-      const slot = this.idleSlot();
-      if (!slot) return;
-      const job = this.queue.shift()!;
+    for (let i = 0; i < this.queue.length; ) {
+      const job = this.queue[i];
+      const slot = this.slotFor(job);
+      if (slot === undefined) return; // no capacity at all
+      if (slot === null) { i++; continue; } // this job must wait; try the next one
+      this.queue.splice(i, 1);
       slot.busy = true;
+      for (const e of job.opts.engines ?? []) slot.reserved.add(e);
       void this.start(job, slot);
     }
   }
@@ -179,19 +202,7 @@ export class WorkerPool {
     job.snap.startedAt = Date.now();
     this.emit(job);
     try {
-      for (const name of job.opts.engines ?? []) {
-        if (slot.engines.has(name)) continue;
-        if (!this.opts.engineLoader) throw new Error('No engine loader configured');
-        const engine = await this.opts.engineLoader.load(name, (l, t) => {
-          job.snap.engineLoading = { name, fraction: t ? l / t : 1 };
-          this.emit(job);
-        });
-        job.snap.engineLoading = { name, fraction: 1 };
-        this.emit(job);
-        await slot.api.loadEngine(name, { bootstrap: engine.manifest.bootstrap, files: engine.files });
-        slot.engines.add(name);
-        job.snap.engineLoading = undefined;
-      }
+      for (const name of job.opts.engines ?? []) await this.ensureEngine(slot, name, job);
       if (job.cancelRequested) throw new CancelledError();
       job.slot = slot;
       const onProgress = proxy((p: TaskProgress) => {
@@ -211,6 +222,25 @@ export class WorkerPool {
       slot.busy = false;
       this.pump();
     }
+  }
+
+  /** Load an engine (and, first, the engines it depends on) into a worker slot. */
+  private async ensureEngine(slot: Slot, name: string, job: Job, depth = 0): Promise<void> {
+    if (slot.engines.has(name)) return;
+    if (depth > 8) throw new Error(`Engine dependency cycle at ${name}`);
+    if (!this.opts.engineLoader) throw new Error('No engine loader configured');
+    const engine = await this.opts.engineLoader.load(name, (l, t) => {
+      job.snap.engineLoading = { name, fraction: t ? l / t : 1 };
+      this.emit(job);
+    });
+    for (const dep of engine.manifest.deps ?? []) await this.ensureEngine(slot, dep, job, depth + 1);
+    job.snap.engineLoading = { name, fraction: 1 };
+    job.snap.message = `init ${name}`;
+    this.emit(job);
+    await slot.api.loadEngine(name as EngineName, { bootstrap: engine.manifest.bootstrap, files: engine.files, meta: engine.manifest.meta });
+    slot.engines.add(name);
+    job.snap.engineLoading = undefined;
+    job.snap.message = undefined;
   }
 
   private finish(job: Job, status: TaskStatus, error?: unknown, result?: unknown) {

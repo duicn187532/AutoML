@@ -58,8 +58,10 @@ class MlpModel implements TrainedModel {
     const epochs = num(this.init.params, 'epochs'), batchSize = num(this.init.params, 'batchSize');
     const patience = num(this.init.params, 'patience');
     const cls = this.init.task !== 'regression';
+    const backend = str(this.init.params, 'backend');
+    if (backend && tf.getBackend() !== backend && !(await tf.setBackend(backend))) throw new Error(`TF.js backend "${backend}" unavailable`);
     const n = data.X.rows;
-    const yArr = cls ? Float32Array.from(data.y) : Float32Array.from(data.y);
+    const yArr = Float32Array.from(data.y);
     const xAll = this.tensor(data.X);
     const yAll = cls ? tf.tensor1d(yArr) : tf.tensor2d(yArr, [n, 1]);
     const xv = data.valid ? this.tensor(data.valid.X) : null;
@@ -160,6 +162,9 @@ export const mlpPlugin: ModelPlugin = {
     { key: 'epochs', type: 'int', default: 100, min: 1, max: 2000, recommended: [50, 300], label: { 'zh-TW': '訓練輪數', en: 'Epochs' } },
     { key: 'batchSize', type: 'int', default: 64, min: 8, max: 4096, recommended: [32, 256], label: { 'zh-TW': '批次大小', en: 'Batch size' } },
     { key: 'patience', type: 'int', default: 10, min: 0, max: 500, recommended: [5, 20], label: { 'zh-TW': 'Early stopping 耐心值', en: 'Early-stopping patience' } },
+    { key: 'backend', type: 'enum', default: 'cpu', label: { 'zh-TW': '運算後端', en: 'Compute backend' },
+      help: { 'zh-TW': 'M0 實測：小型表格 MLP 用 CPU 比 WebGL 快；大模型再改 WebGL。', en: 'M0 benchmark: CPU beats WebGL for small tabular MLPs; use WebGL for large models.' },
+      options: [{ value: 'cpu', label: { 'zh-TW': 'CPU', en: 'CPU' } }, { value: 'webgl', label: { 'zh-TW': 'WebGL（GPU）', en: 'WebGL (GPU)' } }] },
   ],
   create: (init) => new MlpModel(init, undefined, init.rng.nextU32() % 1_000_000),
   async load(a, init) {

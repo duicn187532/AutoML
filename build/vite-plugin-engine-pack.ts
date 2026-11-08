@@ -17,6 +17,8 @@ export interface EngineSourceFile {
   /** Logical name exposed to the worker. */
   as: string;
   kind: EngineFileKind;
+  /** Optional source transform applied at pack time (text files only). */
+  transform?: (code: string) => string;
 }
 
 export interface EngineSpec {
@@ -25,6 +27,8 @@ export interface EngineSpec {
   files: EngineSourceFile[];
   /** Names (EngineSourceFile.as) of JS files to importScripts() in the worker, in order. */
   bootstrap: string[];
+  deps?: string[];
+  meta?: Record<string, unknown>;
 }
 
 export interface EnginePackOptions {
@@ -40,7 +44,8 @@ export function buildEnginePack(spec: EngineSpec, chunkBytes = 2 * 1024 * 1024):
   const files: EngineManifest['files'] = [];
   let offset = 0;
   for (const f of spec.files) {
-    const buf = readFileSync(f.path);
+    const raw = readFileSync(f.path);
+    const buf = f.transform ? Buffer.from(f.transform(raw.toString('utf8')), 'utf8') : raw;
     files.push({
       name: f.as,
       kind: f.kind,
@@ -71,6 +76,8 @@ export function buildEnginePack(spec: EngineSpec, chunkBytes = 2 * 1024 * 1024):
     chunks,
     files,
     bootstrap: spec.bootstrap,
+    deps: spec.deps ?? [],
+    meta: spec.meta,
   };
   out.set(manifestPath(spec.name), `self[${JSON.stringify(MANIFEST_CALLBACK)}](${JSON.stringify(manifest)});\n`);
   return out;

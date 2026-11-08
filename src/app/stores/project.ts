@@ -7,6 +7,7 @@ import {
   type DatasetRecord,
   type ExperimentRecord,
   type ModelRecord,
+  type PipelineRecord,
   type Project,
 } from '@/core/project/types';
 import { freshSeed } from '@/core/rng';
@@ -25,7 +26,8 @@ interface ProjectState {
   newProject(): Promise<void>;
   rename(name: string): void;
   setSeed(seed: number): void;
-  addDataset(table: ColumnarTable, meta: Pick<DatasetRecord, 'name' | 'source' | 'warnings'>): Promise<DatasetRecord>;
+  addDataset(table: ColumnarTable, meta: Pick<DatasetRecord, 'name' | 'source' | 'warnings' | 'derivedFrom'>): Promise<DatasetRecord>;
+  upsertPipeline(p: PipelineRecord): void;
   removeDataset(id: string): Promise<void>;
   getTable(id: string): Promise<ColumnarTable>;
   recordExperiment(exp: ExperimentRecord, model?: { record: ModelRecord; bytes: Uint8Array }): Promise<void>;
@@ -91,6 +93,7 @@ export const useProject = create<ProjectState>((set, get) => {
         name: meta.name,
         source: meta.source,
         warnings: meta.warnings,
+        derivedFrom: meta.derivedFrom,
         rowCount: table.rowCount,
         columns: table.columns.map((c) => profileColumn(c)),
         blobKey: datasetBlobKey(id),
@@ -102,6 +105,12 @@ export const useProject = create<ProjectState>((set, get) => {
       update((q) => ({ ...q, datasets: [...q.datasets, record] }));
       return record;
     },
+
+    upsertPipeline: (rec) =>
+      update((q) => ({
+        ...q,
+        pipelines: q.pipelines.some((x) => x.id === rec.id) ? q.pipelines.map((x) => (x.id === rec.id ? { ...rec, updatedAt: Date.now() } : x)) : [...q.pipelines, rec],
+      })),
 
     async removeDataset(id) {
       const p = get().project!;

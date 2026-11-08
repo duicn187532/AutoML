@@ -42,11 +42,21 @@ export interface DatasetRecord {
   derivedFrom?: { datasetId: string; pipelineId: string };
 }
 
-/** Replayable data-cleaning steps (M2 extends this union). */
+/** Replayable data-cleaning / feature-engineering steps (applied by core/data/ops.ts). */
+export type FilterOp = '<' | '<=' | '>' | '>=' | '==' | '!=' | 'in' | 'notin' | 'isna' | 'notna';
 export type PipelineStep =
   | { op: 'dropColumns'; columns: string[] }
+  | { op: 'renameColumn'; from: string; to: string }
   | { op: 'setKind'; column: string; kind: ColumnProfile['kind'] }
-  | { op: 'dropMissingRows'; columns: string[] };
+  | { op: 'dropMissingRows'; columns: string[] }
+  | { op: 'fillMissing'; column: string; value: string }
+  | { op: 'filterRows'; column: string; cmp: FilterOp; value?: string }
+  | { op: 'dropDuplicates'; columns: string[] }
+  | { op: 'dateExpand'; column: string; parts: ('year' | 'month' | 'day' | 'dow' | 'hour')[]; drop: boolean }
+  | { op: 'mathTransform'; column: string; fn: 'log1p' | 'sqrt' | 'abs' | 'square'; output: string }
+  | { op: 'interaction'; a: string; b: string; fn: '*' | '/' | '+' | '-'; output: string }
+  | { op: 'lag'; column: string; lags: number[]; orderBy?: string; groupBy?: string }
+  | { op: 'rolling'; column: string; window: number; stat: 'mean' | 'std' | 'min' | 'max'; orderBy?: string; groupBy?: string };
 
 export interface PipelineRecord {
   id: string;
@@ -54,6 +64,9 @@ export interface PipelineRecord {
   inputDatasetId: string;
   steps: PipelineStep[];
   createdAt: number;
+  updatedAt?: number;
+  /** Dataset produced by the last "save as dataset". */
+  outputDatasetId?: string;
 }
 
 export interface ModelRecord {
@@ -69,6 +82,7 @@ export interface ModelRecord {
   metrics: MetricSet;
   /** blob: binary-JSON { artifact, preprocessor, target } */
   blobKey: string;
+  sizeBytes?: number;
   experimentId: string;
   createdAt: number;
 }
@@ -82,8 +96,13 @@ export interface ExperimentRecord {
   config: TrainConfig;
   datasetHash: string;
   task?: TaskKind;
-  metrics?: { train: MetricSet; valid: MetricSet };
+  metrics?: { train: MetricSet; valid: MetricSet; test?: MetricSet; cv?: { folds: MetricSet[]; mean: MetricSet; std: MetricSet } };
   confusion?: number[][];
+  validPredictions?: { y: number[]; pred: number[]; proba?: number[][] };
+  featureNames?: string[];
+  featureImportance?: number[];
+  permutation?: { feature: string; mean: number; ci95: number }[];
+  nTest?: number;
   classes?: string[];
   roc?: { fpr: number[]; tpr: number[] };
   history: Record<string, number[]>;
@@ -97,6 +116,10 @@ export interface ExperimentRecord {
   error?: string;
   /** Experiment this one re-ran (reproducibility check). */
   rerunOf?: string;
+  /** Experiments launched together ("train all") share a batch id. */
+  batchId?: string;
+  /** Auto-mode run details (config.pluginId === 'auto'). */
+  auto?: { preset: string; candidates: import('../workers/types').AutoCandidate[]; ensemble: { id: string; label: string; weight: number }[] };
   createdAt: number;
 }
 
@@ -117,3 +140,7 @@ export function emptyProject(id: string, name: string, seed: number, appVersion:
 
 export const datasetBlobKey = (datasetId: string) => `dataset/${datasetId}`;
 export const modelBlobKey = (modelId: string) => `model/${modelId}`;
+
+export function newPipeline(id: string, dataset: Pick<DatasetRecord, 'id' | 'name'>, steps: PipelineStep[]): PipelineRecord {
+  return { id, name: `${dataset.name} pipeline`, inputDatasetId: dataset.id, steps, createdAt: Date.now() };
+}

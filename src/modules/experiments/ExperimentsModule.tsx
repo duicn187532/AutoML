@@ -4,10 +4,11 @@ import { CLASSIFICATION_METRICS, REGRESSION_METRICS, fmtDuration, fmtMetric, fmt
 import { useProject } from '@/app/stores/project';
 import { LiveCurve } from '@/charts/LiveCurve';
 import { METRIC_HIGHER_IS_BETTER, type MetricName } from '@/core/ml/metrics';
-import { getPlugin } from '@/core/models/registry';
+import { pluginName } from '@/core/models/registry';
 import type { ExperimentRecord } from '@/core/project/types';
 import { useT, type MessageKey } from '@/i18n';
 import { ExperimentResult } from '../library/LibraryModule';
+import { PredictPanel } from './PredictPanel';
 
 type SortKey = 'createdAt' | 'name' | 'durationMs' | MetricName;
 
@@ -100,7 +101,7 @@ export function ExperimentsModule() {
                           {src && <br />}
                           {src && <span className={sameMetrics(e, src) ? 'badge done' : 'badge failed'} title={src.name} data-testid="repro-badge">{sameMetrics(e, src) ? '≡' : '≠'} {src.name}</span>}
                         </td>
-                        <td>{t.text(getPlugin(e.config.pluginId).name)}</td>
+                        <td>{t.text(pluginName(e.config.pluginId))}</td>
                         <td className="dataset-cell" title={`${datasetName(e.config.datasetId)} → ${e.config.target}`}>{datasetName(e.config.datasetId)} → {e.config.target}</td>
                         <td className="num">{e.config.seed}</td>
                         <td><span className={`badge ${e.status}`} title={e.error}>{t(`task.${e.status}` as MessageKey)}</span></td>
@@ -127,6 +128,7 @@ export function ExperimentsModule() {
             </div>
           )}
           {detailExp?.metrics && <ExperimentResult exp={detailExp} />}
+          {detailExp?.modelId && <PredictPanel exp={detailExp} />}
         </>
       )}
     </div>

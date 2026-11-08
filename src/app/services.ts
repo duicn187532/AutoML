@@ -14,6 +14,8 @@ export const pool = new WorkerPool({
   createWorker: () => new MlWorker(),
   engineLoader,
   hardCancelMs: 3000,
+  // M0: Pyodide + sklearn stack ≈ 130–460 MB WASM heap per worker → keep a single Python worker.
+  engineWorkerCap: { pyodide: 1 },
 });
 
 export const APP_VERSION: string = __APP_VERSION__;

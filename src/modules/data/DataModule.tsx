@@ -1,18 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { importCsvFile } from '@/app/actions';
-import { fmtBytes, fmtNum } from '@/app/format';
+import { fmtBytes } from '@/app/format';
 import { useProject } from '@/app/stores/project';
 import { useUi } from '@/app/stores/ui';
-import { cellString, type ColumnProfile, type ColumnarTable } from '@/core/data/table';
+import { cellString, type ColumnKind, type ColumnarTable } from '@/core/data/table';
+import { newId } from '@/core/util/id';
+import { newPipeline } from '@/core/project/types';
+import { Clean } from './Clean';
+import { Explore } from './Explore';
+import { useProfile, useTable } from './hooks';
+import { ColumnsTable, QualityReport } from './Overview';
 import { useT, type MessageKey } from '@/i18n';
 import { SAMPLES } from './samples';
+import { ACCEPTED_EXTENSIONS } from '@/core/data/formats';
 
 const PREVIEW_ROWS = 50;
-
-function summary(c: ColumnProfile): string {
-  if (c.kind === 'numeric') return `${fmtNum(c.min)} … ${fmtNum(c.max)} · μ ${fmtNum(c.mean)} · σ ${fmtNum(c.std)}`;
-  return (c.top ?? []).slice(0, 4).map((x) => `${x.value} (${x.count})`).join(', ');
-}
 
 function ImportBar() {
   const t = useT();
@@ -39,7 +41,7 @@ function ImportBar() {
       <input
         ref={inputRef}
         type="file"
-        accept=".csv,.txt,text/csv"
+        accept={ACCEPTED_EXTENSIONS}
         hidden
         data-testid="csv-input"
         onChange={async (e) => {
@@ -61,20 +63,58 @@ function ImportBar() {
   );
 }
 
+type Tab = 'overview' | 'explore' | 'clean' | 'preview';
+
+function Preview({ table }: { table: ColumnarTable }) {
+  const t = useT();
+  return (
+    <div className="card">
+      <h3>{t('data.preview', { n: Math.min(PREVIEW_ROWS, table.rowCount) })}</h3>
+      <div className="table-wrap">
+        <table className="grid compact">
+          <thead>
+            <tr>
+              <th>#</th>
+              {table.columns.map((c) => <th key={c.name}>{c.name}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: Math.min(PREVIEW_ROWS, table.rowCount) }, (_, i) => (
+              <tr key={i}>
+                <td className="muted">{i + 1}</td>
+                {table.columns.map((c) => {
+                  const v = cellString(c, i);
+                  return <td key={c.name} className={v === null ? 'na' : c.kind === 'numeric' ? 'num' : undefined}>{v ?? 'NA'}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function DataModule() {
   const t = useT();
   const datasetId = useUi((s) => s.datasetId);
   const project = useProject((s) => s.project);
-  const { getTable, removeDataset } = useProject();
+  const { removeDataset, upsertPipeline } = useProject();
   const dataset = project?.datasets.find((d) => d.id === datasetId);
-  const [loaded, setLoaded] = useState<{ id: string; table: ColumnarTable } | null>(null);
-  const table = loaded && loaded.id === dataset?.id ? loaded.table : null;
+  const table = useTable(dataset?.id);
+  const [tab, setTab] = useState<Tab>('overview');
+  const [targetSel, setTarget] = useState<{ id: string; col: string } | null>(null);
+  const target = targetSel && targetSel.id === dataset?.id ? targetSel.col : dataset?.columns.at(-1)?.name;
+  const profile = useProfile(dataset?.id, table, target || undefined);
+  const parent = dataset?.derivedFrom ? project?.datasets.find((d) => d.id === dataset.derivedFrom!.datasetId) : undefined;
 
-  useEffect(() => {
-    let alive = true;
-    if (dataset) getTable(dataset.id).then((tb) => alive && setLoaded({ id: dataset.id, table: tb })).catch(console.error);
-    return () => { alive = false; };
-  }, [dataset, getTable]);
+  const setKind = (column: string, kind: ColumnKind) => {
+    if (!dataset || !project) return;
+    const pl = project.pipelines.filter((p) => p.inputDatasetId === dataset.id).at(-1);
+    const step = { op: 'setKind' as const, column, kind };
+    upsertPipeline(pl ? { ...pl, steps: [...pl.steps, step] } : newPipeline(newId('pl'), dataset, [step]));
+    setTab('clean');
+  };
 
   return (
     <div className="module">
@@ -91,7 +131,14 @@ export function DataModule() {
                 {t('data.rows', { n: dataset.rowCount.toLocaleString() })} · {t('data.cols', { n: dataset.columns.length })}
                 {dataset.source.bytes ? ` · ${fmtBytes(dataset.source.bytes)}` : ''} · v{dataset.hash.slice(0, 8)}
               </span>
+              {parent && <button className="link" onClick={() => useUi.getState().selectDataset(parent.id)}>← {t('data.derivedFrom', { name: parent.name })}</button>}
               <div className="spacer" />
+              <label className="small">
+                {t('lib.target')}{' '}
+                <select value={target} onChange={(e) => setTarget({ id: dataset.id, col: e.currentTarget.value })} data-testid="data-target">
+                  {dataset.columns.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                </select>
+              </label>
               <button className="danger" onClick={() => { removeDataset(dataset.id); useUi.getState().selectDataset(null); }}>
                 {t('data.delete')}
               </button>
@@ -102,60 +149,23 @@ export function DataModule() {
                 <ul>{dataset.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
               </details>
             ) : null}
-          </div>
-          <div className="card">
-            <h3>{t('data.columns')}</h3>
-            <div className="table-wrap">
-              <table className="grid" data-testid="columns-table">
-                <thead>
-                  <tr>
-                    <th>{t('data.col.name')}</th>
-                    <th>{t('data.col.kind')}</th>
-                    <th className="num">{t('data.col.missing')}</th>
-                    <th className="num">{t('data.col.unique')}</th>
-                    <th>{t('data.col.summary')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dataset.columns.map((c) => (
-                    <tr key={c.name}>
-                      <td>{c.name}</td>
-                      <td><span className={`kind kind-${c.kind}`}>{t(`kind.${c.kind}` as MessageKey)}</span></td>
-                      <td className="num">{c.missing ? `${c.missing} (${((c.missing / dataset.rowCount) * 100).toFixed(1)}%)` : 0}</td>
-                      <td className="num">{c.unique.toLocaleString()}</td>
-                      <td className="small muted ellipsis">{summary(c)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="tabs" role="tablist">
+              {(['overview', 'explore', 'clean', 'preview'] as Tab[]).map((k) => (
+                <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'tab active' : 'tab'} onClick={() => setTab(k)} data-testid={`tab-${k}`}>
+                  {t(`data.tab.${k}` as MessageKey)}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="card">
-            <h3>{t('data.preview', { n: Math.min(PREVIEW_ROWS, dataset.rowCount) })}</h3>
-            {table && (
-              <div className="table-wrap">
-                <table className="grid compact">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      {table.columns.map((c) => <th key={c.name}>{c.name}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Array.from({ length: Math.min(PREVIEW_ROWS, table.rowCount) }, (_, i) => (
-                      <tr key={i}>
-                        <td className="muted">{i + 1}</td>
-                        {table.columns.map((c) => {
-                          const v = cellString(c, i);
-                          return <td key={c.name} className={v === null ? 'na' : c.kind === 'numeric' ? 'num' : undefined}>{v ?? 'NA'}</td>;
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          {tab === 'overview' && (
+            <>
+              {profile?.profile ? <QualityReport profile={profile.profile} /> : <div className="card muted small">{profile?.error ?? t('quality.running')}</div>}
+              <ColumnsTable dataset={dataset} onSetKind={setKind} />
+            </>
+          )}
+          {tab === 'explore' && (profile?.profile ? <Explore profile={profile.profile} /> : <div className="card muted small">{t('quality.running')}</div>)}
+          {tab === 'clean' && table && <Clean dataset={dataset} table={table} />}
+          {tab === 'preview' && table && <Preview table={table} />}
         </>
       )}
     </div>

@@ -31,6 +31,10 @@ export interface EngineManifest {
   files: EngineFileEntry[];
   /** JS files that the worker must importScripts(), in order. */
   bootstrap: string[];
+  /** Engines that must be loaded (in a worker) before this one. */
+  deps: string[];
+  /** Engine-specific data for the worker adapter (e.g. Python package names). */
+  meta?: Record<string, unknown>;
 }
 
 export const manifestPath = (name: string) => `${ENGINE_DIR}/${name}/manifest.js`;

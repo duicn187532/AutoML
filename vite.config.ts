@@ -1,24 +1,13 @@
 /// <reference types="vitest/config" />
-import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
-import { enginePack, type EngineSpec } from './build/vite-plugin-engine-pack.ts';
+import { engineSpecs } from './build/engines.ts';
+import { enginePack } from './build/vite-plugin-engine-pack.ts';
 import { devCsp, fileProtocol } from './build/vite-plugin-file-protocol.ts';
 
-const require = createRequire(import.meta.url);
-const pkgDir = (name: string) => dirname(require.resolve(`${name}/package.json`));
-const pkgVersion = (name: string): string => require(`${name}/package.json`).version;
-
 /** Engines are packed as chunked base64 classic scripts and loaded on demand (see src/core/engines). */
-const engines: EngineSpec[] = [
-  {
-    name: 'tfjs',
-    version: pkgVersion('@tensorflow/tfjs'),
-    files: [{ path: join(pkgDir('@tensorflow/tfjs'), 'dist/tf.min.js'), as: 'tf.min.js', kind: 'js' }],
-    bootstrap: ['tf.min.js'],
-  },
-];
+const engines = engineSpecs();
 
 export default defineConfig({
   base: './',

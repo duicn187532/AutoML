@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { AutoModule } from '@/modules/auto/AutoModule';
 import { DataModule } from '@/modules/data/DataModule';
 import { ExperimentsModule } from '@/modules/experiments/ExperimentsModule';
 import { LibraryModule } from '@/modules/library/LibraryModule';
@@ -37,7 +38,8 @@ export function App() {
           {module === 'data' && <DataModule />}
           {module === 'library' && <LibraryModule />}
           {module === 'experiments' && <ExperimentsModule />}
-          {(module === 'auto' || module === 'dag' || module === 'script') && <PlannedModule module={module} />}
+          {module === 'auto' && <AutoModule />}
+          {(module === 'dag' || module === 'script') && <PlannedModule module={module} />}
         </ErrorBoundary>
       </main>
       <SidePanel />

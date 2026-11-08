@@ -1,5 +1,6 @@
 import { cellString, getColumn, type Column, type ColumnarTable } from '../data/table';
 import type { Matrix } from './matrix';
+import { hashString } from '../rng';
 
 /**
  * Tabular preprocessing. Statistics are fitted on TRAINING ROWS ONLY and stored as plain JSON,
@@ -14,6 +15,9 @@ export interface PreprocessConfig {
   /** Keep the N most frequent categories (in train); the rest map to an "other" slot. */
   maxCategories: number;
   missingIndicators: boolean;
+  /** How categorical columns become numbers. Target encoding is fitted on training rows only (smoothed). */
+  categoricalEncoding?: 'onehot' | 'ordinal' | 'target' | 'hash';
+  hashBuckets?: number;
 }
 
 export const DEFAULT_PREPROCESS: PreprocessConfig = {
@@ -21,11 +25,16 @@ export const DEFAULT_PREPROCESS: PreprocessConfig = {
   numericImpute: 'median',
   maxCategories: 30,
   missingIndicators: true,
+  categoricalEncoding: 'onehot',
+  hashBuckets: 32,
 };
 
 export type FeatureStep =
   | { type: 'numeric'; column: string; fill: number; center: number; scale: number; indicator: boolean }
   | { type: 'onehot'; column: string; categories: string[]; other: boolean }
+  | { type: 'ordinal'; column: string; categories: string[] }
+  | { type: 'hash'; column: string; buckets: number }
+  | { type: 'target'; column: string; outputs: number; table: Record<string, number[]>; prior: number[] }
   | { type: 'datetime'; column: string; parts: ('year' | 'month' | 'day' | 'dow')[]; fill: number[]; center: number[]; scale: number[] };
 
 export interface PreprocessorState {
@@ -74,6 +83,8 @@ export function fitPreprocessor(
   features: string[],
   trainIdx: ArrayLike<number>,
   config: PreprocessConfig = DEFAULT_PREPROCESS,
+  /** Needed only for target encoding: encoded target (class index or value) for every row. */
+  target?: { y: Float64Array; nClasses: number },
 ): PreprocessorState {
   const steps: FeatureStep[] = [];
   const skipped: PreprocessorState['skipped'] = [];
@@ -96,8 +107,11 @@ export function fitPreprocessor(
       }
       const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
       if (sorted.length < 2) { skipped.push({ column: name, reason: 'constant' }); continue; }
-      const categories = sorted.slice(0, config.maxCategories).map(([v]) => v);
-      steps.push({ type: 'onehot', column: name, categories, other: true });
+      const enc = config.categoricalEncoding ?? 'onehot';
+      if (enc === 'ordinal') steps.push({ type: 'ordinal', column: name, categories: sorted.map(([v]) => v) });
+      else if (enc === 'hash') steps.push({ type: 'hash', column: name, buckets: config.hashBuckets ?? 32 });
+      else if (enc === 'target' && target) steps.push(fitTargetEncoding(col, name, trainIdx, target));
+      else steps.push({ type: 'onehot', column: name, categories: sorted.slice(0, config.maxCategories).map(([v]) => v), other: true });
     } else if (col.kind === 'datetime') {
       const per: number[][] = DT_PARTS.map(() => []);
       for (let i = 0; i < trainIdx.length; i++) {
@@ -114,6 +128,30 @@ export function fitPreprocessor(
   return { version: 1, config, steps, outputNames: outputNames(steps), skipped };
 }
 
+/** Smoothed target mean per category (m-estimate, m = 10); multiclass → one column per class. */
+function fitTargetEncoding(col: Column, name: string, trainIdx: ArrayLike<number>, target: { y: Float64Array; nClasses: number }): FeatureStep {
+  const k = target.nClasses || 1;
+  const outputs = target.nClasses > 2 ? k : 1;
+  const enc = (y: number) => (target.nClasses > 2 ? Array.from({ length: k }, (_, c) => (y === c ? 1 : 0)) : [y]);
+  const prior = new Array<number>(outputs).fill(0);
+  const sums = new Map<string, { s: number[]; n: number }>();
+  let n = 0;
+  for (let i = 0; i < trainIdx.length; i++) {
+    const r = trainIdx[i], y = target.y[r];
+    if (Number.isNaN(y)) continue;
+    const v = enc(y), key = cellString(col, r) ?? MISSING_TOKEN;
+    const e = sums.get(key) ?? { s: new Array<number>(outputs).fill(0), n: 0 };
+    v.forEach((x, j) => { e.s[j] += x; prior[j] += x; });
+    e.n++; n++;
+    sums.set(key, e);
+  }
+  prior.forEach((_, j) => (prior[j] /= n || 1));
+  const m = 10;
+  const table: Record<string, number[]> = {};
+  for (const [key, e] of sums) table[key] = e.s.map((x, j) => (x + m * prior[j]) / (e.n + m));
+  return { type: 'target', column: name, outputs, table, prior };
+}
+
 function outputNames(steps: FeatureStep[]): string[] {
   const out: string[] = [];
   for (const s of steps) {
@@ -123,7 +161,10 @@ function outputNames(steps: FeatureStep[]): string[] {
     } else if (s.type === 'onehot') {
       for (const c of s.categories) out.push(`${s.column}=${c}`);
       if (s.other) out.push(`${s.column}=__other__`);
-    } else for (const p of s.parts) out.push(`${s.column}.${p}`);
+    } else if (s.type === 'ordinal') out.push(`${s.column}#ord`);
+    else if (s.type === 'hash') for (let b = 0; b < s.buckets; b++) out.push(`${s.column}#h${b}`);
+    else if (s.type === 'target') for (let j = 0; j < s.outputs; j++) out.push(`${s.column}#te${s.outputs > 1 ? j : ''}`);
+    else for (const p of s.parts) out.push(`${s.column}.${p}`);
   }
   return out;
 }
@@ -155,6 +196,23 @@ export function transform(state: PreprocessorState, table: ColumnarTable, rowIdx
         else if (s.other) data[i * cols + offset + s.categories.length] = 1;
       }
       offset += width;
+    } else if (s.type === 'ordinal') {
+      const index = new Map(s.categories.map((c, k) => [c, k]));
+      const scale = Math.max(1, s.categories.length - 1);
+      for (let i = 0; i < n; i++) {
+        const k = index.get(cellString(col, rowIdx ? rowIdx[i] : i) ?? MISSING_TOKEN);
+        data[i * cols + offset] = k === undefined ? -1 : k / scale;
+      }
+      offset += 1;
+    } else if (s.type === 'hash') {
+      for (let i = 0; i < n; i++) data[i * cols + offset + (hashString(cellString(col, rowIdx ? rowIdx[i] : i) ?? MISSING_TOKEN) % s.buckets)] = 1;
+      offset += s.buckets;
+    } else if (s.type === 'target') {
+      for (let i = 0; i < n; i++) {
+        const v = s.table[cellString(col, rowIdx ? rowIdx[i] : i) ?? MISSING_TOKEN] ?? s.prior;
+        for (let j = 0; j < s.outputs; j++) data[i * cols + offset + j] = v[j];
+      }
+      offset += s.outputs;
     } else {
       for (let i = 0; i < n; i++) {
         const p = dateParts(cellString(col, rowIdx ? rowIdx[i] : i));
