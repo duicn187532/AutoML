@@ -175,3 +175,19 @@ select.kind { padding: 1px 4px; }
 .preset.active { border-color: var(--accent); background: var(--accent-soft); }
 .auto-form .row .field { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
 .model-card { white-space: pre-wrap; font-family: var(--mono); font-size: 12px; background: var(--bg); padding: 12px; border-radius: 6px; max-height: 420px; overflow: auto; }
+.cell { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.cell-head { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+textarea.code { width: 100%; border: none; border-radius: 0; font-family: var(--mono); font-size: 13px; line-height: 1.45; padding: 10px 12px; resize: vertical; background: var(--panel); color: var(--text); tab-size: 4; }
+textarea.code:focus { outline: none; box-shadow: inset 2px 0 0 var(--accent); }
+.cell-out { border-top: 1px solid var(--border); padding: 8px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+.cell-out pre { margin: 0; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; max-height: 400px; overflow: auto; }
+.cell-out img { max-width: 100%; background: #fff; border-radius: 4px; align-self: flex-start; }
+.ok { color: var(--ok); }
+.cell { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.cell-head { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+textarea.code { width: 100%; border: none; border-radius: 0; font-family: var(--mono); font-size: 13px; line-height: 1.45; padding: 10px 12px; resize: vertical; background: var(--panel); color: var(--text); tab-size: 4; }
+textarea.code:focus { outline: none; box-shadow: inset 2px 0 0 var(--accent); }
+.cell-out { border-top: 1px solid var(--border); padding: 8px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+.cell-out pre { margin: 0; font-family: var(--mono); font-size: 12px; white-space: pre-wrap; max-height: 400px; overflow: auto; }
+.cell-out img { max-width: 100%; background: #fff; border-radius: 4px; align-self: flex-start; }
+.ok { color: var(--ok); }

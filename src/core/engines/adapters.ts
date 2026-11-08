@@ -146,4 +146,5 @@ export const ENGINE_ADAPTERS: Partial<Record<EngineName, EngineAdapter>> = {
   'py-sklearn': pyPackAdapter(),
   'py-gbdt': pyPackAdapter(),
   'py-stats': pyPackAdapter(),
+  'py-plot': pyPackAdapter(),
 };

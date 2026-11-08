@@ -30,7 +30,7 @@ export interface Project {
 export interface DatasetRecord {
   id: string;
   name: string;
-  source: { type: 'csv' | 'sample' | 'derived'; fileName?: string; bytes?: number };
+  source: { type: 'csv' | 'sample' | 'derived' | 'script'; fileName?: string; bytes?: number };
   rowCount: number;
   columns: ColumnProfile[];
   /** blob: encoded ColumnarTable */

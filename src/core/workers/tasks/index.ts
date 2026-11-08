@@ -1,6 +1,8 @@
 import type { TaskContext, TaskKindName, TaskMap } from '../types';
 import { autoTask } from './auto';
 import { predictTask } from './predict';
+import { pyRunTask } from './pyRun';
+import { trainGraphTask } from './trainGraph';
 import { benchmarkTask } from './benchmark';
 import { profileTable } from '../../data/explore';
 import { applyPipeline } from '../../data/ops';
@@ -17,6 +19,8 @@ export const TASK_HANDLERS: { [K in TaskKindName]: Handler<K> } = {
   benchmark: benchmarkTask,
   auto: autoTask,
   predict: predictTask,
+  pyRun: pyRunTask,
+  trainGraph: trainGraphTask,
   profile: async ({ table, target }) => profileTable(table, target),
   applyPipeline: async ({ table, steps }) => applyPipeline(table, steps),
 };

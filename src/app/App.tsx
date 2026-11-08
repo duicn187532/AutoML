@@ -4,6 +4,7 @@ import { DataModule } from '@/modules/data/DataModule';
 import { ExperimentsModule } from '@/modules/experiments/ExperimentsModule';
 import { LibraryModule } from '@/modules/library/LibraryModule';
 import { PlannedModule } from '@/modules/planned/PlannedModule';
+import { ScriptModule } from '@/modules/script/ScriptModule';
 import { NavRail } from './NavRail';
 import { SidePanel } from './SidePanel';
 import { TopBar } from './TopBar';
@@ -39,7 +40,8 @@ export function App() {
           {module === 'library' && <LibraryModule />}
           {module === 'experiments' && <ExperimentsModule />}
           {module === 'auto' && <AutoModule />}
-          {(module === 'dag' || module === 'script') && <PlannedModule module={module} />}
+          {module === 'script' && <ScriptModule />}
+          {module === 'dag' && <PlannedModule module={module} />}
         </ErrorBoundary>
       </main>
       <SidePanel />

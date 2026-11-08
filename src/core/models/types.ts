@@ -4,7 +4,7 @@ import type { TaskKind } from '../ml/preprocess';
 import type { Rng } from '../rng';
 
 /** Heavy runtimes loaded on demand as engine packs. Plugins with `engines: []` are pure TS. */
-export type EngineName = 'tfjs' | 'pyodide' | 'py-sklearn' | 'py-gbdt' | 'py-stats' | 'xlsx' | 'duckdb' | 'transformers';
+export type EngineName = 'tfjs' | 'pyodide' | 'py-sklearn' | 'py-gbdt' | 'py-stats' | 'py-plot' | 'xlsx' | 'duckdb' | 'transformers';
 
 export type ModelFamily = 'linear' | 'tree' | 'ensemble' | 'kernel' | 'neighbors' | 'bayes' | 'neural' | 'cluster' | 'other';
 

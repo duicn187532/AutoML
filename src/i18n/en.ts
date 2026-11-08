@@ -231,4 +231,12 @@ export const en: Record<MessageKey, string> = {
   'search.run': 'Start search',
   'search.noDims': 'Select parameters to search',
   'search.influence': 'Hyper-parameter influence (parallel coordinates)',
+  'script.addCell': 'Add cell',
+  'script.runAll': 'Run all',
+  'script.restart': 'Restart kernel',
+  'script.datasets': 'Datasets',
+  'script.hint': 'Offline Python (Pyodide): numpy, pandas, scikit-learn, XGBoost, LightGBM, statsmodels, matplotlib. Shift+Enter runs a cell; aml.load("name") reads a dataset, aml.save_dataset(df, "name") adds one to the workbench.',
+  'script.saved': 'Saved dataset "{name}" ({n} rows)',
+  'script.copyAsCode': 'Copy as code',
+  'export.python': 'Download .py',
 };

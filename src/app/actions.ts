@@ -12,7 +12,10 @@ import { newId } from '@/core/util/id';
 import type { TaskHandle } from '@/core/workers/pool';
 import type { AutoOutput, TrainConfig, TrainOutput } from '@/core/workers/types';
 import { pool, storage } from './services';
+import { safeFileName } from '@/core/security/escape';
 import { toCsv } from '@/core/data/csv';
+import type { ColumnarTable } from '@/core/data/table';
+import { experimentToPython } from '@/core/export/python';
 import { modelEngines } from '@/core/workers/tasks/predict';
 import type { EngineName } from '@/core/models/types';
 import { detectFormat } from '@/core/data/formats';
@@ -200,4 +203,40 @@ export async function searchParams(base: TrainConfig, dims: SearchDim[], method:
   const worker = async () => { for (let i = next++; i < total; i = next++) await runOne(i); };
   await Promise.all(Array.from({ length: parallel }, worker));
   return batchId;
+}
+
+const SCRIPT_ENGINES: EngineName[] = ['pyodide', 'py-sklearn', 'py-stats', 'py-plot'];
+
+/** Run one script cell; datasets referenced as aml.load('name') are sent along. */
+export async function runScriptCell(session: string, code: string, reset = false) {
+  const store = useProject.getState();
+  const project = store.project!;
+  const names = [...code.matchAll(/aml\.load\(\s*(['"])(.+?)\1\s*\)/g)].map((m) => m[2]);
+  const tables: Record<string, ColumnarTable> = {};
+  for (const n of new Set(names)) {
+    const d = project.datasets.find((x) => x.name === n);
+    if (d) tables[n] = await store.getTable(d.id);
+  }
+  const out = await pool.submit({ kind: 'pyRun', input: { session, code, tables, reset } }, { label: 'script cell', engines: SCRIPT_ENGINES }).result;
+  for (const s of out.saved) await store.addDataset(s.table, { name: s.name, source: { type: 'script' } });
+  return out;
+}
+
+/** "Copy as code": append an experiment's Python reproduction to the project's first script. */
+export function copyExperimentToScript(exp: ExperimentRecord): void {
+  const store = useProject.getState();
+  const project = store.project!;
+  const ds = project.datasets.find((d) => d.id === exp.config.datasetId);
+  if (!ds) throw new Error('Dataset not found');
+  const code = experimentToPython(exp, ds, 'workbench');
+  const script = project.scripts[0] ?? { id: newId('s'), name: 'Script 1', cells: [], updatedAt: Date.now() };
+  store.upsertScript({ ...script, cells: [...script.cells, { id: newId('c'), source: code }], updatedAt: Date.now() });
+}
+
+/** M8: standalone Python reproduction of an experiment (reads <dataset>.csv). */
+export function downloadPython(exp: ExperimentRecord): void {
+  const project = useProject.getState().project!;
+  const ds = project.datasets.find((d) => d.id === exp.config.datasetId);
+  if (!ds) throw new Error('Dataset not found');
+  downloadBytes(experimentToPython(exp, ds, 'standalone'), `${safeFileName(exp.name)}.py`, 'text/x-python');
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { searchParams, startTraining, trainAll, type SearchMethod } from '@/app/actions';
+import { copyExperimentToScript, downloadPython, searchParams, startTraining, trainAll, type SearchMethod } from '@/app/actions';
 import type { SearchDim } from '@/core/auto/search';
 import { Leaderboard, ParamInfluence } from '../experiments/Leaderboard';
 import { CLASSIFICATION_METRICS, REGRESSION_METRICS, fmtDuration, fmtMetric } from '@/app/format';
@@ -34,6 +34,13 @@ export function ExperimentResult({ exp }: { exp: ExperimentRecord }) {
     <div className="card" data-testid="result">
       <div className="row">
         <h3>{t('lib.result')} · {exp.name}</h3>
+        <span className="spacer" />
+        {exp.config.pluginId !== 'auto' && (
+          <>
+            <button className="link" onClick={() => { copyExperimentToScript(exp); useUi.getState().setModule('script'); }} data-testid="copy-code">{t('script.copyAsCode')}</button>
+            <button className="link" onClick={() => downloadPython(exp)}>{t('export.python')}</button>
+          </>
+        )}
         <span className="muted small">
           n<sub>train</sub>={exp.nTrain} · n<sub>valid</sub>={exp.nValid}{exp.nTest ? <> · n<sub>test</sub>={exp.nTest}</> : null} · {fmtDuration(exp.durationMs)}
           {exp.bestEpoch ? ` · best epoch ${exp.bestEpoch}` : ''}

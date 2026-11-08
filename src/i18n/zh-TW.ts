@@ -230,6 +230,14 @@ export const zhTW = {
   'search.run': '開始搜尋',
   'search.noDims': '請勾選要搜尋的參數',
   'search.influence': '超參數影響（平行座標）',
+  'script.addCell': '新增 cell',
+  'script.runAll': '全部執行',
+  'script.restart': '重啟 kernel',
+  'script.datasets': '可用資料集',
+  'script.hint': '離線 Python（Pyodide）：numpy、pandas、scikit-learn、XGBoost、LightGBM、statsmodels、matplotlib。Shift+Enter 執行；以 aml.load("名稱") 讀取資料集，aml.save_dataset(df, "名稱") 存回工作台。',
+  'script.saved': '已存為資料集「{name}」（{n} 列）',
+  'script.copyAsCode': '複製成程式碼',
+  'export.python': '下載 .py',
 } as const;
 
 export type MessageKey = keyof typeof zhTW;

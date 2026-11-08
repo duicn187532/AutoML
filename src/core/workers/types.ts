@@ -177,6 +177,57 @@ export interface PredictOutput {
   ids?: (string | null)[];
 }
 
+export interface PyRunInput {
+  session: string;
+  code: string;
+  /** Datasets referenced by the cell (aml.load('name')), by name. */
+  tables?: Record<string, ColumnarTable>;
+  reset?: boolean;
+}
+export interface PyRunOutput {
+  stdout: string;
+  stderr: string;
+  result: string | null;
+  error: string | null;
+  /** base64 PNGs of matplotlib figures */
+  images: string[];
+  saved: { name: string; table: ColumnarTable }[];
+  durationMs: number;
+}
+
+export interface TrainGraphInput {
+  table: ColumnarTable;
+  graph: import('../dag/graph').Graph;
+  features: string[];
+  seed: number;
+  validFraction: number;
+  epochs: number;
+  batchSize: number;
+  learningRate: number;
+  patience: number;
+}
+export interface GateStats {
+  meanWeight: number[];
+  /** share of validation samples whose largest weight goes to each expert */
+  share: number[];
+  /** features (standardised means) that distinguish each expert's samples */
+  topFeatures: { name: string; z: number }[][];
+}
+export interface TrainGraphOutput {
+  mode: 'end-to-end' | 'two-stage';
+  metrics: Record<string, MetricSet>;
+  heads: { node: string; target: string; task: TaskKind; classes?: string[] }[];
+  gates: Record<string, GateStats>;
+  experts?: { node: string; pluginId: string; metrics: MetricSet; fitMs: number }[];
+  history: Record<string, number[]>;
+  notes: string[];
+  totalParams: number;
+  nTrain: number;
+  nValid: number;
+  artifact: { graph: import('../dag/graph').Graph; preprocessor: PreprocessorState; targets: Record<string, TargetState>; weights: { shape: number[]; data: number[] }[] };
+  durationMs: number;
+}
+
 /** Map of task kinds → [input, output]. */
 export interface TaskMap {
   parseCsv: [ParseCsvInput, ParseCsvOutput];
@@ -185,6 +236,8 @@ export interface TaskMap {
   benchmark: [BenchmarkInput, BenchmarkOutput];
   auto: [AutoInput, AutoOutput];
   predict: [PredictInput, PredictOutput];
+  pyRun: [PyRunInput, PyRunOutput];
+  trainGraph: [TrainGraphInput, TrainGraphOutput];
   profile: [{ table: ColumnarTable; target?: string }, DataProfile];
   applyPipeline: [{ table: ColumnarTable; steps: PipelineStep[] }, { table: ColumnarTable; log: StepLog[] }];
 }

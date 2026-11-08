@@ -58,29 +58,33 @@ export function engineSpecs(): EngineSpec[] {
 
   // Wheel packs (need `node scripts/fetch-pyodide.mjs`); skipped with a warning when not vendored.
   const lock = JSON.parse(readFileSync(join(pyDir, 'pyodide-lock.json'), 'utf8')) as { packages: Record<string, { file_name: string; depends: string[] }> };
-  const shipped = new Set<string>();
+  // wheel file → pack that ships it; a pack depends on every earlier pack holding one of its wheels
+  const shippedBy = new Map<string, string>();
   for (const g of PY_PACK_GROUPS) {
-    const files = new Set<string>();
+    const own = new Set<string>(), deps = new Set<string>(g.deps);
     const visit = (n: string) => {
       const p = lock.packages[n];
-      if (!p || shipped.has(p.file_name) || files.has(p.file_name)) return;
-      files.add(p.file_name);
+      if (!p || own.has(p.file_name)) return;
+      const owner = shippedBy.get(p.file_name);
+      if (owner) deps.add(owner);
+      else own.add(p.file_name);
       p.depends.forEach(visit);
     };
     g.roots.forEach(visit);
-    const paths = [...files].map((f) => join('vendor/pyodide', f));
+    const files = [...own];
+    const paths = files.map((f) => join('vendor/pyodide', f));
     const missing = paths.filter((p) => !existsSync(p));
     if (missing.length) {
       console.warn(`[engines] ${g.engine}: ${missing.length} wheels missing — run \`node scripts/fetch-pyodide.mjs\`. Pack skipped.`);
       continue;
     }
-    files.forEach((f) => shipped.add(f));
+    files.forEach((f) => shippedBy.set(f, g.engine));
     specs.push({
       name: g.engine,
       version: pyVersion,
-      files: paths.map((p, i) => ({ path: p, as: [...files][i], kind: 'data' as const })),
+      files: paths.map((p, i) => ({ path: p, as: files[i], kind: 'data' as const })),
       bootstrap: [],
-      deps: g.deps,
+      deps: ['pyodide', ...[...deps].filter((d) => d !== 'pyodide')],
       meta: { packages: g.roots },
     });
   }
