@@ -409,4 +409,5 @@ export const en: Record<MessageKey, string> = {
   'task.pause': 'Pause queue',
   'task.resume': 'Resume queue',
   'export.onnx': 'ONNX',
+  'unsup.m.autoencoder': 'Autoencoder (reconstruction error)',
 };

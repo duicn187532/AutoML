@@ -18,6 +18,7 @@ const METHODS: { id: UnsupervisedMethod; group: 'cluster' | 'reduce' | 'anomaly'
   { id: 'tsne', group: 'reduce', params: { perplexity: 30 } },
   { id: 'isolation_forest', group: 'anomaly', params: { contamination: 0.05, trees: 200 } },
   { id: 'lof', group: 'anomaly', params: { contamination: 0.05, neighbors: 20 } },
+  { id: 'autoencoder', group: 'anomaly', params: { contamination: 0.05, hidden: 32, epochs: 80 } },
 ];
 const PALETTE = ['#2563eb', '#ea580c', '#16a34a', '#9333ea', '#dc2626', '#0891b2', '#ca8a04', '#db2777', '#64748b', '#0d9488'];
 
@@ -50,7 +51,7 @@ export function Unsupervised({ dataset, table }: { dataset: DatasetRecord; table
   const run = async () => {
     setBusy(true); setError(null);
     try {
-      setOut(await pool.submit({ kind: 'unsupervised', input: { table, features, method, params, seed } }, { label: `${method} · ${dataset.name}`, engines: ['pyodide', 'py-sklearn'] }).result);
+      setOut(await pool.submit({ kind: 'unsupervised', input: { table, features, method, params, seed } }, { label: `${method} · ${dataset.name}`, engines: method === 'autoencoder' ? ['tfjs'] : ['pyodide', 'py-sklearn'] }).result);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
   const saveColumns = async () => {

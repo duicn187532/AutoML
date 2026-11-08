@@ -1,4 +1,5 @@
 import type { PyHandle } from '../../engines/adapters';
+import { autoencoder, neuralForecast } from './neuralSeries';
 import { cellString, getColumn } from '../../data/table';
 import { DEFAULT_PREPROCESS, fitPreprocessor, transform } from '../../ml/preprocess';
 import type { ForecastInput, ForecastOutput, TaskContext, UnsupervisedInput, UnsupervisedOutput } from '../types';
@@ -11,6 +12,10 @@ export async function unsupervisedTask(input: UnsupervisedInput, ctx: TaskContex
   const prep = fitPreprocessor(input.table, input.features, all, { ...DEFAULT_PREPROCESS, missingIndicators: false });
   const X = transform(prep, input.table, all);
   ctx.progress({ fraction: 0.2, message: input.method });
+  if (input.method === 'autoencoder') {
+    const r = await autoencoder(ctx.engine('tfjs'), X, input.params, input.seed, ctx);
+    return { method: 'autoencoder', ...r, featureNames: prep.outputNames, durationMs: performance.now() - t0 };
+  }
   const h = ctx.engine<PyHandle>('pyodide');
   const out = JSON.parse(h.bridge.unsupervised(input.method, JSON.stringify(input.params), X.data, X.rows, X.cols, input.seed)) as Omit<UnsupervisedOutput, 'durationMs' | 'featureNames'>;
   ctx.progress({ fraction: 1 });
@@ -43,11 +48,12 @@ export async function forecastTask(input: ForecastInput, ctx: TaskContext): Prom
   if (rows.length < 12) throw new Error('Need at least 12 observations');
   rows.sort((a, b) => a.t - b.t);
   const freq = tc.kind === 'numeric' ? { stepMs: 1, label: 'index', seasonGuess: 0 } : detectFrequency(rows.map((r) => r.t));
-  const params = { ...input.params, season: input.params.season ?? freq.seasonGuess };
+  const params: Record<string, number | string> = { ...input.params, season: input.params.season ?? freq.seasonGuess };
   const y = Float64Array.from(rows, (r) => r.y);
   ctx.progress({ fraction: 0.2, message: input.method });
-  const h = ctx.engine<PyHandle>('pyodide');
-  const res = JSON.parse(h.bridge.forecast(input.method, JSON.stringify(params), y, y.length, input.horizon, input.holdout)) as Pick<ForecastOutput, 'holdout' | 'forecast' | 'aic'>;
+  const res: Pick<ForecastOutput, 'holdout' | 'forecast' | 'aic'> = input.method === 'arima' || input.method === 'ets'
+    ? JSON.parse(ctx.engine<PyHandle>('pyodide').bridge.forecast(input.method, JSON.stringify(params), y, y.length, input.horizon, input.holdout))
+    : await neuralForecast(ctx.engine('tfjs'), y, input.method, { ...params, window: params.window ?? (freq.seasonGuess ? 2 * freq.seasonGuess : 24) }, input.horizon, input.holdout, ctx);
   const last = rows[rows.length - 1].t;
   const fmt = (t: number) => (tc.kind === 'numeric' ? String(t) : new Date(t).toISOString().slice(0, freq.stepMs < 86400e3 ? 16 : 10));
   return {

@@ -35,7 +35,7 @@ export function Forecast({ dataset, table }: { dataset: DatasetRecord; table: Co
   const valueCols = dataset.columns.filter((c) => c.kind === 'numeric');
   const [timeColumn, setTime] = useState(dataset.columns.find((c) => c.kind === 'datetime')?.name ?? timeCols[0]?.name ?? '');
   const [valueColumn, setValue] = useState(valueCols.at(-1)?.name ?? '');
-  const [method, setMethod] = useState<'arima' | 'ets'>('ets');
+  const [method, setMethod] = useState<'arima' | 'ets' | 'lstm' | 'gru' | 'tcn'>('ets');
   const [params, setParams] = useState<Record<string, number | string>>({ p: 1, d: 1, q: 1, trend: 'add', seasonal: 'add' });
   const [horizon, setHorizon] = useState(12);
   const [holdout, setHoldout] = useState(12);
@@ -45,8 +45,8 @@ export function Forecast({ dataset, table }: { dataset: DatasetRecord; table: Co
   const run = async () => {
     setBusy(true); setError(null);
     try {
-      setOut(await pool.submit({ kind: 'forecast', input: { table, timeColumn, valueColumn, method, params: method === 'arima' ? { p: params.p, d: params.d, q: params.q } : { trend: params.trend, seasonal: params.seasonal }, horizon, holdout } },
-        { label: `${method} · ${valueColumn}`, engines: ['pyodide', 'py-sklearn', 'py-stats'] }).result);
+      setOut(await pool.submit({ kind: 'forecast', input: { table, timeColumn, valueColumn, method, params: method === 'arima' ? { p: params.p, d: params.d, q: params.q } : method === 'ets' ? { trend: params.trend, seasonal: params.seasonal } : { units: params.units ?? 32, epochs: params.epochs ?? 60 }, horizon, holdout } },
+        { label: `${method} · ${valueColumn}`, engines: method === 'arima' || method === 'ets' ? ['pyodide', 'py-sklearn', 'py-stats'] : ['tfjs'] }).result);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
   return (
@@ -54,8 +54,10 @@ export function Forecast({ dataset, table }: { dataset: DatasetRecord; table: Co
       <div className="card form">
         <div className="field"><label>{t('fc.time')}</label><select value={timeColumn} onChange={(e) => setTime(e.currentTarget.value)}>{timeCols.map((c) => <option key={c.name}>{c.name}</option>)}</select></div>
         <div className="field"><label>{t('fc.value')}</label><select value={valueColumn} onChange={(e) => setValue(e.currentTarget.value)}>{valueCols.map((c) => <option key={c.name}>{c.name}</option>)}</select></div>
-        <div className="field"><label>{t('unsup.method')}</label><select value={method} onChange={(e) => setMethod(e.currentTarget.value as 'arima' | 'ets')}><option value="ets">ETS (Holt-Winters)</option><option value="arima">ARIMA</option></select></div>
-        {method === 'arima' ? (
+        <div className="field"><label>{t('unsup.method')}</label><select value={method} onChange={(e) => setMethod(e.currentTarget.value as typeof method)} data-testid="fc-method"><option value="ets">ETS (Holt-Winters)</option><option value="arima">ARIMA</option><option value="lstm">LSTM</option><option value="gru">GRU</option><option value="tcn">TCN</option></select></div>
+        {['lstm', 'gru', 'tcn'].includes(method) ? (
+          <div className="row2">{(['units', 'epochs'] as const).map((k) => <div className="field" key={k}><label>{k}</label><input type="number" min={1} value={Number(params[k] ?? (k === 'units' ? 32 : 60))} onChange={(e) => setParams((p) => ({ ...p, [k]: Number(e.currentTarget.value) }))} /></div>)}</div>
+        ) : method === 'arima' ? (
           <div className="row2">{(['p', 'd', 'q'] as const).map((k) => <div className="field" key={k}><label>{k}</label><input type="number" min={0} max={5} value={Number(params[k])} onChange={(e) => setParams((p) => ({ ...p, [k]: Number(e.currentTarget.value) }))} /></div>)}</div>
         ) : (
           <div className="row2">{(['trend', 'seasonal'] as const).map((k) => <div className="field" key={k}><label>{k}</label><select value={String(params[k])} onChange={(e) => setParams((p) => ({ ...p, [k]: e.currentTarget.value }))}>{['add', 'mul', 'none'].map((o) => <option key={o}>{o}</option>)}</select></div>)}</div>

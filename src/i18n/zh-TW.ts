@@ -408,6 +408,7 @@ export const zhTW = {
   'task.pause': '暫停佇列',
   'task.resume': '繼續佇列',
   'export.onnx': 'ONNX',
+  'unsup.m.autoencoder': 'Autoencoder（重建誤差）',
 } as const;
 
 export type MessageKey = keyof typeof zhTW;

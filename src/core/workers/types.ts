@@ -228,7 +228,7 @@ export interface TrainGraphOutput {
   durationMs: number;
 }
 
-export type UnsupervisedMethod = 'kmeans' | 'dbscan' | 'agglomerative' | 'gmm' | 'pca' | 'tsne' | 'isolation_forest' | 'lof';
+export type UnsupervisedMethod = 'kmeans' | 'dbscan' | 'agglomerative' | 'gmm' | 'pca' | 'tsne' | 'isolation_forest' | 'lof' | 'autoencoder';
 export interface UnsupervisedInput { table: ColumnarTable; features: string[]; method: UnsupervisedMethod; params: Record<string, number | string>; seed: number }
 export interface UnsupervisedOutput {
   method: UnsupervisedMethod;
@@ -251,7 +251,7 @@ export interface ForecastInput {
   table: ColumnarTable;
   timeColumn: string;
   valueColumn: string;
-  method: 'arima' | 'ets';
+  method: 'arima' | 'ets' | 'lstm' | 'gru' | 'tcn';
   params: Record<string, number | string>;
   horizon: number;
   holdout: number;
