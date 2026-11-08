@@ -1,0 +1,112 @@
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { EngineSpec } from './vite-plugin-engine-pack.ts';
+import { PY_PACK_GROUPS } from './pyodide-packs.mjs';
+import { IMAGE_BACKBONES } from './image-backbones.mjs';
+
+/** Package directory without relying on `exports` exposing package.json (xlsx does not). */
+const pkgDir = (name: string) => join('node_modules', name);
+const pkgVersion = (name: string): string => JSON.parse(readFileSync(join(pkgDir(name), 'package.json'), 'utf8')).version;
+
+/** Virtual base URL the worker serves Pyodide files from (never hits the network). */
+export const PYODIDE_VBASE = 'https://aml-engine.invalid/pyodide/';
+
+/**
+ * pyodide.asm.mjs is an ES module, which cannot run in a classic (file://-compatible) worker.
+ * Rewrite its single `export default` and `import.meta.url` so it can be importScripts()-ed.
+ */
+function classicPyodideAsm(code: string): string {
+  const out = code
+    .replace(/export default _createPyodideModule;?/, 'self._createPyodideModule=_createPyodideModule;')
+    .replace(/import\.meta\.url/g, JSON.stringify(`${PYODIDE_VBASE}pyodide.asm.mjs`));
+  if (/\bexport\s+default\b/.test(out) || !out.includes('self._createPyodideModule=')) throw new Error('pyodide.asm.mjs transform failed (Pyodide layout changed?)');
+  return out;
+}
+
+export function engineSpecs(): EngineSpec[] {
+  const tfDir = pkgDir('@tensorflow/tfjs');
+  const specs: EngineSpec[] = [
+    {
+      name: 'tfjs',
+      version: pkgVersion('@tensorflow/tfjs'),
+      files: [{ path: join(tfDir, 'dist/tf.min.js'), as: 'tf.min.js', kind: 'js' }],
+      bootstrap: ['tf.min.js'],
+    },
+  ];
+
+  specs.push({
+    name: 'xlsx',
+    version: pkgVersion('xlsx'),
+    files: [{ path: join(pkgDir('xlsx'), 'dist/xlsx.full.min.js'), as: 'xlsx.full.min.js', kind: 'js' }],
+    bootstrap: ['xlsx.full.min.js'],
+  });
+
+  // Larger sample datasets (tutorial) — loaded only when the user picks one
+  specs.push({
+    name: 'samples', version: '1', bootstrap: [],
+    files: ['iris.csv', 'titanic.csv', 'house-prices-train.csv'].map((f) => ({ path: join('samples', f), as: f, kind: 'data' as const })),
+  });
+
+  const pyDir = pkgDir('pyodide');
+  const pyVersion = pkgVersion('pyodide');
+  specs.push({
+    name: 'pyodide',
+    version: pyVersion,
+    files: [
+      { path: join(pyDir, 'pyodide.asm.mjs'), as: 'pyodide.asm.mjs', kind: 'js', transform: classicPyodideAsm },
+      { path: join(pyDir, 'pyodide.js'), as: 'pyodide.js', kind: 'js' },
+      { path: join(pyDir, 'pyodide.asm.wasm'), as: 'pyodide.asm.wasm', kind: 'wasm' },
+      { path: join(pyDir, 'python_stdlib.zip'), as: 'python_stdlib.zip', kind: 'data' },
+      { path: join(pyDir, 'pyodide-lock.json'), as: 'pyodide-lock.json', kind: 'json' },
+    ],
+    bootstrap: ['pyodide.asm.mjs', 'pyodide.js'],
+    meta: { vbase: PYODIDE_VBASE },
+  });
+
+  // Pretrained image backbones (need `node scripts/fetch-models.mjs`)
+  for (const b of IMAGE_BACKBONES) {
+    const dir = join('vendor/models', b.id);
+    if (!existsSync(join(dir, 'model.json'))) { console.warn(`[engines] ${b.id}: not vendored — run \`node scripts/fetch-models.mjs\`. Pack skipped.`); continue; }
+    const model = JSON.parse(readFileSync(join(dir, 'model.json'), 'utf8')) as { weightsManifest: { paths: string[] }[] };
+    const shards = model.weightsManifest.flatMap((g) => g.paths);
+    specs.push({
+      name: b.id, version: '1', bootstrap: [], deps: ['tfjs'],
+      files: [{ path: join(dir, 'model.json'), as: 'model.json', kind: 'json' }, ...shards.map((p) => ({ path: join(dir, p), as: p, kind: 'data' as const }))],
+      meta: { kind: 'image-backbone', label: b.label, size: b.size, feature: b.feature, shards },
+    });
+  }
+
+  // Wheel packs (need `node scripts/fetch-pyodide.mjs`); skipped with a warning when not vendored.
+  const lock = JSON.parse(readFileSync(join(pyDir, 'pyodide-lock.json'), 'utf8')) as { packages: Record<string, { file_name: string; depends: string[] }> };
+  // wheel file → pack that ships it; a pack depends on every earlier pack holding one of its wheels
+  const shippedBy = new Map<string, string>();
+  for (const g of PY_PACK_GROUPS) {
+    const own = new Set<string>(), deps = new Set<string>(g.deps);
+    const visit = (n: string) => {
+      const p = lock.packages[n];
+      if (!p || own.has(p.file_name)) return;
+      const owner = shippedBy.get(p.file_name);
+      if (owner) deps.add(owner);
+      else own.add(p.file_name);
+      p.depends.forEach(visit);
+    };
+    g.roots.forEach(visit);
+    const files = [...own];
+    const paths = files.map((f) => join('vendor/pyodide', f));
+    const missing = paths.filter((p) => !existsSync(p));
+    if (missing.length) {
+      console.warn(`[engines] ${g.engine}: ${missing.length} wheels missing — run \`node scripts/fetch-pyodide.mjs\`. Pack skipped.`);
+      continue;
+    }
+    files.forEach((f) => shippedBy.set(f, g.engine));
+    specs.push({
+      name: g.engine,
+      version: pyVersion,
+      files: paths.map((p, i) => ({ path: p, as: files[i], kind: 'data' as const })),
+      bootstrap: [],
+      deps: ['pyodide', ...[...deps].filter((d) => d !== 'pyodide')],
+      meta: { packages: g.roots },
+    });
+  }
+  return specs;
+}

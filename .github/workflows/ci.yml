@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/fetch-pyodide.mjs
+      - run: node scripts/fetch-models.mjs
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: E2E (file://, offline)
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          npm run e2e
+      # Uploading the folder itself → the downloaded artifact is ONE zip containing index.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: automl-workbench
+          path: dist
+          retention-days: 90

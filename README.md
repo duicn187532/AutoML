@@ -1,38 +1,81 @@
-# Tabular AutoML (TF.js + ML-bundle) — README
+# AutoML Workbench
 
-一個在瀏覽器就能跑的表格資料 AutoML + 可解釋訓練平台。支援 **CSV 上傳、特徵型別自動判斷、關係係數排序（Pearson/η/Cramér’s V）**、**Auto/預設/自訂**三種建模模式、**TF.js 深度模型**與**傳統 ML（樹/森林/KNN/SVM/NB）**、即時圖表（Loss/Acc/LR/ROC/混淆矩陣/指標表）、**模型與 metadata 輸出入**、以及 **2D Playground** 可視化決策邊界。全程在本機執行、無需伺服器與外傳資料。
+瀏覽器內的 ML / DL 工作台（類似 MATLAB 的 Classification / Regression Learner、Experiment Manager、Deep Network Designer、Live Script），
+**無後端、可離線**：解壓縮 zip 後雙擊 `index.html`（`file://`）即可使用，資料不會離開你的電腦。同一份建置也可直接放上 GitHub Pages。
 
----
+第一次開啟會出現 6 步驟的快速導覽（右上角「教學」可再次開啟）。
 
-## 目錄
-- [特色](#特色)
-- [快速開始](#快速開始)
-- [資料需求（CSV）](#資料需求csv)
-- [操作流程](#操作流程)
-- [模型模式與參數](#模型模式與參數)
-- [自訂層（拖拉積木）](#自訂層拖拉積木)
-- [訓練過程與圖表](#訓練過程與圖表)
-- [可解釋性與報告](#可解釋性與報告)
-- [Playground（互動視覺化）](#playground互動視覺化)
-- [模型匯出 / 匯入](#模型匯出--匯入)
-- [客製化](#客製化)
-- [常見問題與除錯](#常見問題與除錯)
-- [限制與建議](#限制與建議)
-- [檔案結構（建議）](#檔案結構建議)
-- [授權](#授權)
+## 使用方式（只需要瀏覽器）
 
----
+不需要安裝 npm、Python 或任何程式；建置由 GitHub 的伺服器自動完成。
 
-## 特色
-- **純前端**：TensorFlow.js + 傳統 ML（ml-bundle.js），無需後端。
-- **特徵型別自動判斷**：數值 / 類別；支援 One-Hot 與數值正規化（MinMax / Z-score）。
-- **關係係數一鍵看**：選好目標欄位即顯示各特徵與目標的相關性，並依絕對值排序（Pearson r / η / Cramér’s V）。
-- **三種建模模式**  
-  - Auto：自動嘗試多種 TF.js 與傳統 ML，邊訓練邊釋放較差模型，節省記憶體。  
-  - 預設：卡片式選型，顯示用途/層數/簡介，可展開原理。  
-  - 自訂：拖拉式積木堆層（Dense/Dropout/BatchNorm/Activation/Flatten）。
-- **圖表與度量**：Loss/Val Loss、（分類）Val Acc、學習率曲線、混淆矩陣、ROC & AUC、Precision/Recall/F1、（回歸）MSE/RMSE。
-- **可解釋性輸出**：訓練結束自動生成說明（為何選此模型、特徵選擇依據、重點指標）。
-- **模型與前處理同步**：輸出 `model.json/.bin + metadata.json`；預測時套用一致前處理。
-- **Playground**：2D 決策邊界即時渲染（合成資料/特徵變換），幫助初學者理解模型行為。
-- **記憶體友好**：嚴格 `dispose()` tensor / model；Auto 模式中隨訓練即時釋放非最佳候選。
+1. **下載**（擇一）
+   - **Releases**：到本 repo 右側「Releases」，下載 `automl-workbench-vX.Y.Z.zip`。
+   - **最新建置**：到「Actions」→「CI」→ 最新一筆綠色勾勾的執行 → 頁面下方 Artifacts 的 `automl-workbench`（需登入 GitHub，保留 90 天）。
+2. **解壓縮**：Windows 在 zip 上按右鍵 →「解壓縮全部」；macOS 直接雙擊 zip。請保持資料夾結構（`index.html` 旁邊要有 `assets/`、`engines/`）。
+3. **開啟**：用 Chrome 或 Edge 雙擊 `index.html`。之後完全離線可用。
+4. （選用）**GitHub Pages**：啟用後可直接用網址開啟，不必下載。
+
+> 只用瀏覽器修改程式碼也可以：在 GitHub 網頁上編輯檔案並 commit，CI 會自動測試並產生新的下載檔。
+
+## 六個模組
+
+| 模組 | 功能 |
+|---|---|
+| **資料準備** | 匯入 CSV / TSV（UTF-8、Big5）、Excel、JSON、Parquet、圖片資料夾；型別推斷（全量掃描、NA 字串）；資料品質報告與 **target leakage 偵測**；分佈 / 相關矩陣 / 特徵與目標關係；可重播的清理與特徵工程步驟（刪欄、篩選、去重、日期展開、交互項、lag / rolling…）另存衍生資料集；圖片標註工具（鍵盤快捷鍵、webcam 收集） |
+| **自動模式** | 快速 / 平衡 / 最佳品質；≤ 2 萬列 k-fold、以上 hold-out；k-fold OOF bagging、TPE + successive halving（時間預算）、Caruana ensemble selection；測試集最後只評估一次；leaderboard（CV ± std、訓練 / 推論時間、大小）、model card、一鍵「在模型庫打開」 |
+| **模型庫** | 監督式：線性 / 邏輯、Ridge、ElasticNet、決策樹、隨機森林、ExtraTrees、AdaBoost、HistGBDT、**XGBoost**、**LightGBM**、SVM、kNN、Naive Bayes、LDA / QDA、高斯過程、MLP；「全部訓練」leaderboard；超參數搜尋（grid / random / TPE、平行座標）；hold-out / k-fold / 時間序 / 群組切分；one-hot / ordinal / target / hash 編碼、文字 TF-IDF；混淆矩陣、ROC、門檻滑桿、校準曲線、殘差圖、特徵重要性、permutation importance（95% CI）。非監督：K-means、GMM、階層式、DBSCAN、PCA、t-SNE、Isolation Forest、LOF、Autoencoder。時間序列：ARIMA、ETS、LSTM、GRU、TCN。影像：MobileNet 遷移學習（只練分類頭 / 部分解凍微調）、CNN 從零訓練、自動選 backbone |
+| **架構編輯器** | 拖拉節點圖（Input、Dense、Block、Expert、Gate、Merge、Head…），即時形狀與參數量檢查；soft gating、top-k MoE（load balancing）、規則分流；含 XGBoost / RF 等 expert 時自動改用兩階段訓練；門衛視覺化；Wide & Deep、MoE、多任務、ResNet 式範本；JSON 匯入匯出；產生 Keras / PyTorch / TF.js 程式碼 |
+| **實驗管理** | 每次訓練自動記錄（設定、seed、資料版本、分數、耗時），排序 / 篩選 / 曲線比較；以相同 seed 一鍵重跑並驗證完全重現；批次預測、單筆預測解釋（TreeSHAP / 特徵替換）；匯出 **單檔 HTML 預測器**、**ONNX**、模型 JSON + JS runtime、TF.js、Python 腳本、model card；任務佇列可暫停 / 取消 |
+| **腳本模式** | 離線 Python（Pyodide：numpy、pandas、scikit-learn、XGBoost、LightGBM、statsmodels、matplotlib）；`aml.load()` / `aml.save_dataset()` 與 GUI 共用資料；「複製成程式碼」把 GUI 實驗變成可執行 cell |
+
+專案（資料集、管線、模型、實驗、腳本、網路架構）自動存在瀏覽器 IndexedDB；**正式存檔請用「匯出專案 .zip」**（`file://` 頁面的瀏覽器儲存可能被清除）。
+
+## 支援瀏覽器與限制
+
+- **Chrome / Edge 桌機版**：已實測 `file://`（見 [ADR 0001](docs/decisions/0001-file-protocol-loading.md)）。Firefox / Safari 尚未驗證。
+- 第一次使用 Python 模型會冷啟動 Pyodide 約 10 秒；同一時間只保留一個 Python worker。
+- 建議資料量上限：GBDT 約 50 萬列 × 20 欄（約 20–30 秒、0.5 GB）；網路參數量超過 500 萬會警示（[ADR 0002](docs/decisions/0002-engines-and-limits.md)）。
+- 取消正在執行的 Python 訓練會重啟 worker（瀏覽器沒有可中斷 Python 的機制）。
+- 尚未提供：文字 embedding 模型（目前用 TF-IDF）、GAN / GNN / 強化學習 / 音訊、ONNX 匯出 ensemble。見 [ROADMAP](docs/ROADMAP.md)、[ADR 0003](docs/decisions/0003-deferred-items.md)。
+
+## 開發（開發者用；一般使用者不需要）
+
+以下指令由 GitHub Actions 自動執行；只有想在自己電腦上開發時才需要 Node.js。
+
+```bash
+npm install
+npm run fetch:pyodide     # 一次：Pyodide wheels（sklearn / XGBoost / LightGBM / statsmodels / matplotlib）→ vendor/
+npm run fetch:models      # 一次：MobileNet 預訓練權重 → vendor/
+npm run dev               # 開發伺服器
+npm test                  # 單元測試（指標已與 scikit-learn 比對）
+npm run lint && npm run typecheck
+npm run build             # dist/：index.html + assets/ + engines/（可直接 zip 交付）
+npm run e2e               # 以 file:// + 離線模式跑完整流程（Playwright Chromium）
+npm run m0:file-protocol  # 瀏覽器在 file:// 下的能力檢查
+npm run m0:benchmark      # GBDT / TF.js / Pyodide 效能（需先 build）
+scripts/verify-exports/run.sh   # ONNX 與 JS runtime 對照 sklearn / XGBoost / LightGBM 的預測
+```
+
+發佈新版本（全部在瀏覽器完成）：GitHub repo →「Releases」→「Draft a new release」→ 輸入新 tag（例如 `v0.1.0`）→ Publish。
+`.github/workflows/release.yml` 會自動建置、測試、把離線 zip 附到該 Release，並部署 GitHub Pages
+（Pages 需先在 Settings → Pages → Source 選「GitHub Actions」）。
+
+## 架構重點
+
+- **單一 IIFE bundle + inline Blob worker**：`file://` 無法載入 ES module 或從檔案建立 worker。
+- **引擎包**：TF.js、Pyodide 與 wheels、SheetJS、MobileNet、範例資料都打包成分塊 base64 classic script，用到才載入、顯示進度、sha256 驗證；Pyodide 的資源請求在 worker 內由引擎包供應（不連網）。
+- **模型 plugin 介面**（`src/core/models/types.ts`）：`fit / predict / predictProba / export / load` + 參數 schema（表單自動產生）。
+- **可重現、不洩漏**：所有隨機步驟用有 seed 的 PRNG 子串流；前處理只在訓練資料 fit；測試集只評估一次。
+- **安全**：嚴格 CSP（無 `unsafe-eval`、無遠端主機）；lint 禁止 `innerHTML`；使用者字串一律 escape；CSV 輸出防公式注入。
+
+```
+src/core/     與 UI 無關：data / ml / models / workers / engines / storage / project / export / dag / auto / security
+src/app/      外框、狀態、actions、服務單例
+src/modules/  六個模組畫面          src/charts/  uPlot（即時曲線）、ECharts（分析圖）
+build/        Vite plugins 與引擎清單    samples/  範例資料    docs/  路線圖與決策紀錄    legacy/  舊版（參考）
+```
+
+## 授權
+
+目前沿用 AGPL-3.0（見 `LICENSE`）。是否改授權（例如 MIT / Apache-2.0）需由專案擁有者決定；相依套件授權：TF.js / Pyodide / XGBoost / LightGBM（Apache-2.0）、scikit-learn / statsmodels / pandas / numpy（BSD）、SheetJS CE（Apache-2.0）、ECharts（Apache-2.0）、uPlot（MIT）。
