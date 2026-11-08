@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { safeFileName } from '@/core/security/escape';
 import { LOCALES, useLocale, useT } from '@/i18n';
 import { downloadBytes } from './actions';
+import { Tutorial, shouldAutoOpenTutorial } from './Tutorial';
 import { useProject } from './stores/project';
 import { useUi } from './stores/ui';
 
@@ -11,6 +12,7 @@ export function TopBar() {
   const { locale, setLocale } = useLocale();
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [tour, setTour] = useState(shouldAutoOpenTutorial);
   if (!project) return <header className="topbar" />;
 
   const onExport = async () => {
@@ -75,6 +77,8 @@ export function TopBar() {
       <button className="primary" onClick={onExport} disabled={busy} data-testid="export-zip">
         {t('project.export')}
       </button>
+      <button className="link" onClick={() => setTour(true)} data-testid="open-tutorial">{t('tut.open')}</button>
+      {tour && <Tutorial onClose={() => setTour(false)} />}
       <select aria-label={t('app.language')} value={locale} onChange={(e) => setLocale(e.currentTarget.value as typeof locale)}>
         {LOCALES.map((l) => (
           <option key={l} value={l}>

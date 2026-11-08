@@ -12,7 +12,8 @@ import { Explore } from './Explore';
 import { useProfile, useTable } from './hooks';
 import { ColumnsTable, QualityReport } from './Overview';
 import { useT, type MessageKey } from '@/i18n';
-import { SAMPLES } from './samples';
+import { SAMPLES, sampleBytes } from './samples';
+import { engineLoader } from '@/app/services';
 import { ACCEPTED_EXTENSIONS } from '@/core/data/formats';
 
 const PREVIEW_ROWS = 50;
@@ -61,12 +62,13 @@ function ImportBar() {
       }} />
       <span className="muted small">{t('data.importHint')}</span>
       <div className="spacer" />
-      <span className="small muted">{t('data.loadSample')}:</span>
-      {SAMPLES.map((s) => (
-        <button key={s.id} disabled={busy} data-testid={`sample-${s.id}`} onClick={() => run(() => importCsvFile(s.fileName, new TextEncoder().encode(s.csv).buffer as ArrayBuffer, 'sample'))}>
-          {t.text(s.label)}
-        </button>
-      ))}
+      <select value="" disabled={busy} data-testid="sample-select" onChange={(e) => {
+        const s = SAMPLES.find((x) => x.id === e.currentTarget.value);
+        if (s) void run(async () => importCsvFile(s.fileName, await sampleBytes(s, () => engineLoader.load('samples')), 'sample'));
+      }}>
+        <option value="">{t('data.loadSample')}…</option>
+        {SAMPLES.map((s) => <option key={s.id} value={s.id}>{t.text(s.label)}</option>)}
+      </select>
       {error && <div className="error-text small full">{error}</div>}
     </div>
   );

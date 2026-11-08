@@ -41,6 +41,12 @@ export function engineSpecs(): EngineSpec[] {
     bootstrap: ['xlsx.full.min.js'],
   });
 
+  // Larger sample datasets (tutorial) — loaded only when the user picks one
+  specs.push({
+    name: 'samples', version: '1', bootstrap: [],
+    files: ['iris.csv', 'titanic.csv', 'house-prices-train.csv'].map((f) => ({ path: join('samples', f), as: f, kind: 'data' as const })),
+  });
+
   const pyDir = pkgDir('pyodide');
   const pyVersion = pkgVersion('pyodide');
   specs.push({

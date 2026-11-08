@@ -1,0 +1,54 @@
+name: Release & Pages
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/fetch-pyodide.mjs
+      - run: node scripts/fetch-models.mjs
+      - run: npm test
+      - run: npm run build
+      - name: E2E (file://, offline)
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          npm run e2e
+      - name: Package offline zip (double-click index.html)
+        run: |
+          cp samples/README.md dist/SAMPLES.md
+          cd dist && zip -qr ../automl-workbench-${GITHUB_REF_NAME}.zip .
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: automl-workbench-*.zip
+          generate_release_notes: true
+
+  pages:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
