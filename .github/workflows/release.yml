@@ -1,4 +1,4 @@
-name: Release & Pages
+name: Release
 
 on:
   # Publishing a release in the GitHub web UI (Releases → Draft a new release) builds and attaches the zip.
@@ -8,8 +8,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 jobs:
   build:
@@ -34,9 +32,6 @@ jobs:
         run: |
           cp samples/README.md dist/SAMPLES.md
           cd dist && zip -qr ../automl-workbench-${GITHUB_REF_NAME}.zip .
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
       - name: GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -44,14 +39,3 @@ jobs:
           files: automl-workbench-*.zip
           generate_release_notes: true
 
-  pages:
-    # Needs Settings → Pages → Source: "GitHub Actions". A failure here does not affect the release zip.
-    needs: build
-    continue-on-error: true
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - id: deploy
-        uses: actions/deploy-pages@v4

@@ -14,7 +14,7 @@
    - **最新建置**：到「Actions」→「CI」→ 最新一筆綠色勾勾的執行 → 頁面下方 Artifacts 的 `automl-workbench`（需登入 GitHub，保留 90 天）。
 2. **解壓縮**：Windows 在 zip 上按右鍵 →「解壓縮全部」；macOS 直接雙擊 zip。請保持資料夾結構（`index.html` 旁邊要有 `assets/`、`engines/`）。
 3. **開啟**：用 Chrome 或 Edge 雙擊 `index.html`。之後完全離線可用。
-4. （選用）**GitHub Pages**：啟用後可直接用網址開啟，不必下載。
+4. （選用）**GitHub Pages**：網址 https://duicn187532.github.io/AutoML/ 。需先在 Settings → Pages →「Build and deployment」→ Source 選「GitHub Actions」（不是「Deploy from a branch」，否則網址會顯示原始碼而打不開）；之後每次合併到 main 會由 `.github/workflows/pages.yml` 自動部署。
 
 > 只用瀏覽器修改程式碼也可以：在 GitHub 網頁上編輯檔案並 commit，CI 會自動測試並產生新的下載檔。
 
@@ -58,8 +58,8 @@ scripts/verify-exports/run.sh   # ONNX 與 JS runtime 對照 sklearn / XGBoost /
 ```
 
 發佈新版本（全部在瀏覽器完成）：GitHub repo →「Releases」→「Draft a new release」→ 輸入新 tag（例如 `v0.1.0`）→ Publish。
-`.github/workflows/release.yml` 會自動建置、測試、把離線 zip 附到該 Release，並部署 GitHub Pages
-（Pages 需先在 Settings → Pages → Source 選「GitHub Actions」）。
+`.github/workflows/release.yml` 會自動建置、測試、把離線 zip 附到該 Release。
+GitHub Pages 由 `.github/workflows/pages.yml` 在每次推送 main 時部署（Source 需為「GitHub Actions」）。
 
 ## 架構重點
 
