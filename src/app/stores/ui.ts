@@ -18,6 +18,9 @@ interface UiState {
   setLibraryPrefill(p: LibraryPrefill | null): void;
   setModule(m: ModuleId): void;
   selectDataset(id: string | null): void;
+  /** Narrow screens: datasets / tasks drawer. */
+  drawer: boolean;
+  setDrawer(open: boolean): void;
 }
 
 export const useUi = create<UiState>((set) => ({
@@ -25,6 +28,8 @@ export const useUi = create<UiState>((set) => ({
   datasetId: null,
   libraryPrefill: null,
   setLibraryPrefill: (libraryPrefill) => set((s) => ({ libraryPrefill, datasetId: libraryPrefill?.datasetId ?? s.datasetId })),
-  setModule: (module) => set({ module }),
+  setModule: (module) => set({ module, drawer: false }),
   selectDataset: (datasetId) => set({ datasetId }),
+  drawer: false,
+  setDrawer: (drawer) => set({ drawer }),
 }));

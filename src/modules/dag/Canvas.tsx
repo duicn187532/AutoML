@@ -39,22 +39,6 @@ export function Canvas({ graph, analysis, selected, onSelect, onChange, onMoveEn
     return { x: e.clientX - r.left - pan.x, y: e.clientY - r.top - pan.y };
   };
 
-  useEffect(() => {
-    if (!drag) return;
-    const move = (e: MouseEvent) => {
-      if (drag.kind === 'pan') setPan({ x: drag.orig.x + e.clientX - drag.start.x, y: drag.orig.y + e.clientY - drag.start.y });
-      else if (drag.kind === 'wire') setDrag({ ...drag, to: toLocal(e) });
-      else {
-        const dx = e.clientX - drag.start.x, dy = e.clientY - drag.start.y;
-        onChange({ ...graph, nodes: graph.nodes.map((n) => (drag.orig[n.id] ? { ...n, x: Math.round((drag.orig[n.id].x + dx) / 10) * 10, y: Math.round((drag.orig[n.id].y + dy) / 10) * 10 } : n)) }, false);
-      }
-    };
-    const up = () => { if (drag.kind === 'move') onMoveEnd(); setDrag(null); };
-    window.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', up);
-    return () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
-  });
-
   const connect = (to: string, port: Port) => {
     if (drag?.kind !== 'wire' || drag.from === to) return;
     if (graph.edges.some((e) => e.from === drag.from && e.to === to && e.port === port)) return;
@@ -67,12 +51,38 @@ export function Canvas({ graph, analysis, selected, onSelect, onChange, onMoveEn
     onChange({ ...graph, edges: [...edges, e] }, true);
   };
 
+  useEffect(() => {
+    if (!drag) return;
+    const move = (e: PointerEvent) => {
+      if (drag.kind === 'pan') setPan({ x: drag.orig.x + e.clientX - drag.start.x, y: drag.orig.y + e.clientY - drag.start.y });
+      else if (drag.kind === 'wire') setDrag({ ...drag, to: toLocal(e) });
+      else {
+        const dx = e.clientX - drag.start.x, dy = e.clientY - drag.start.y;
+        onChange({ ...graph, nodes: graph.nodes.map((n) => (drag.orig[n.id] ? { ...n, x: Math.round((drag.orig[n.id].x + dx) / 10) * 10, y: Math.round((drag.orig[n.id].y + dy) / 10) * 10 } : n)) }, false);
+      }
+    };
+    const up = (e: PointerEvent) => {
+      if (drag.kind === 'move') onMoveEnd();
+      if (drag.kind === 'wire') {
+        // Touch pointers stay captured by the element where the drag started, so hit-test the drop point instead of relying on pointerup targets.
+        const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<SVGElement>('[data-port], [data-node]');
+        const id = el?.dataset.node;
+        if (id) connect(id, (el.dataset.port as Port | undefined) ?? 'in');
+      }
+      setDrag(null);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up); };
+  });
+
   return (
     <svg
       ref={svg}
       className="dag-canvas"
       data-testid="dag-canvas"
-      onMouseDown={(e) => { if (e.target === svg.current) { onSelect([]); setDrag({ kind: 'pan', start: { x: e.clientX, y: e.clientY }, orig: pan }); } }}
+      onPointerDown={(e) => { if (e.target === svg.current) { onSelect([]); setDrag({ kind: 'pan', start: { x: e.clientX, y: e.clientY }, orig: pan }); } }}
     >
       <defs>
         <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="1" fill="var(--border)" /></pattern>
@@ -85,7 +95,7 @@ export function Canvas({ graph, analysis, selected, onSelect, onChange, onMoveEn
           if (!a || !b) return null;
           const sel = selected.includes(e.id);
           return (
-            <g key={e.id} className="dag-edge" onMouseDown={(ev) => { ev.stopPropagation(); onSelect([e.id]); }}>
+            <g key={e.id} className="dag-edge" onPointerDown={(ev) => { ev.stopPropagation(); onSelect([e.id]); }}>
               <path d={edgePath(portPos(a, 'out'), portPos(b, e.port), e.port === 'ctrl')} stroke="transparent" strokeWidth={12} fill="none" />
               <path d={edgePath(portPos(a, 'out'), portPos(b, e.port), e.port === 'ctrl')} stroke={sel ? 'var(--accent)' : e.port === 'ctrl' ? '#db2777' : 'var(--muted)'} strokeWidth={sel ? 2.5 : 1.6} strokeDasharray={e.port === 'ctrl' ? '5 4' : undefined} fill="none" markerEnd="url(#arrow)" />
               <text x={(portPos(a, 'out').x + portPos(b, e.port).x) / 2} y={(portPos(a, 'out').y + portPos(b, e.port).y) / 2 - 6} className="dag-shape">{analysis.info[e.from]?.out ?? '?'}</text>
@@ -105,15 +115,14 @@ export function Canvas({ graph, analysis, selected, onSelect, onChange, onMoveEn
             : n.type === 'expert' ? `${n.params.model}` : n.type === 'gate' ? `${n.params.mode}${n.params.mode === 'topk' ? ` k=${n.params.k}` : ''}` : n.type === 'merge' ? String(n.params.mode)
             : n.type === 'head' ? `→ ${n.params.target || '?'}` : n.type === 'dropout' ? `p=${n.params.rate}` : n.type === 'activation' ? String(n.params.fn) : '';
           return (
-            <g key={n.id} transform={`translate(${n.x},${n.y})`} className="dag-node" data-testid={`node-${n.type}`}
-              onMouseDown={(e) => {
+            <g key={n.id} transform={`translate(${n.x},${n.y})`} className="dag-node" data-testid={`node-${n.type}`} data-node={n.id}
+              onPointerDown={(e) => {
                 e.stopPropagation();
                 const ids = e.shiftKey ? (sel ? selected.filter((x) => x !== n.id) : [...selected, n.id]) : sel ? selected : [n.id];
                 onSelect(ids);
                 const orig = Object.fromEntries(graph.nodes.filter((x) => ids.includes(x.id)).map((x) => [x.id, { x: x.x, y: x.y }]));
                 setDrag({ kind: 'move', start: { x: e.clientX, y: e.clientY }, orig });
               }}
-              onMouseUp={() => connect(n.id, 'in')}
             >
               <rect width={NODE_W} height={NODE_H} rx={8} fill="var(--panel)" stroke={bad ? 'var(--danger)' : sel ? 'var(--accent)' : 'var(--border)'} strokeWidth={bad || sel ? 2.2 : 1.2} />
               <rect width={6} height={NODE_H} rx={3} fill={COLORS[n.type]} />
@@ -121,9 +130,9 @@ export function Canvas({ graph, analysis, selected, onSelect, onChange, onMoveEn
               <text x={14} y={36} className="dag-sub">{sub}</text>
               <text x={14} y={53} className="dag-sub">{info?.out != null ? `out ${info.out}` : 'out ?'}{info?.params ? ` · ${fmtParams(info.params)} params` : ''}</text>
               {bad && <title>{info.errors.map((e) => t(`dag.err.${e}` as MessageKey)).join('\n')}</title>}
-              {spec.maxInputs > 0 && <circle cx={0} cy={NODE_H / 2} r={6} className="port in" onMouseUp={(e) => { e.stopPropagation(); connect(n.id, 'in'); setDrag(null); }} />}
-              {spec.hasCtrl && <circle cx={NODE_W / 2} cy={0} r={6} className="port ctrl" onMouseUp={(e) => { e.stopPropagation(); connect(n.id, 'ctrl'); setDrag(null); }}><title>control</title></circle>}
-              {n.type !== 'head' && <circle cx={NODE_W} cy={NODE_H / 2} r={6} className="port out" onMouseDown={(e) => { e.stopPropagation(); setDrag({ kind: 'wire', from: n.id, to: toLocal(e) }); }} />}
+              {spec.maxInputs > 0 && <circle cx={0} cy={NODE_H / 2} r={6} className="port in" data-node={n.id} data-port="in" />}
+              {spec.hasCtrl && <circle cx={NODE_W / 2} cy={0} r={6} className="port ctrl" data-node={n.id} data-port="ctrl"><title>control</title></circle>}
+              {n.type !== 'head' && <circle cx={NODE_W} cy={NODE_H / 2} r={6} className="port out" onPointerDown={(e) => { e.stopPropagation(); setDrag({ kind: 'wire', from: n.id, to: toLocal(e) }); }} />}
             </g>
           );
         })}

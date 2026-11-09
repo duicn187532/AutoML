@@ -78,10 +78,15 @@ function TasksPanel() {
 }
 
 export function SidePanel() {
+  const { drawer, setDrawer } = useUi();
   return (
-    <aside className="side">
-      <DatasetsPanel />
-      <TasksPanel />
-    </aside>
+    <>
+      {drawer && <div className="drawer-backdrop" onClick={() => setDrawer(false)} aria-hidden="true" />}
+      <aside className={drawer ? 'side open' : 'side'} id="side-panel">
+        <button className="link drawer-close" onClick={() => setDrawer(false)} aria-label="close">✕</button>
+        <DatasetsPanel />
+        <TasksPanel />
+      </aside>
+    </>
   );
 }
