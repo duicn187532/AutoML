@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="HACHIMAN STUDIO">
+  <title>HACHIMAN STUDIO · 八萬</title>
+  <defs>
+    <clipPath id="tile"><rect width="512" height="512" rx="84" ry="84"/></clipPath>
+    <radialGradient id="face" cx="0.55" cy="0.62" r="0.62">
+      <stop offset="0" stop-color="#F49D44"/>
+      <stop offset="0.7" stop-color="#EE953D"/>
+      <stop offset="1" stop-color="#E2862F"/>
+    </radialGradient>
+    <radialGradient id="irisL" cx="0.45" cy="0.7" r="0.7">
+      <stop offset="0" stop-color="#FDE7AE"/>
+      <stop offset="0.65" stop-color="#FAD58A"/>
+      <stop offset="1" stop-color="#F0B866"/>
+    </radialGradient>
+  </defs>
+  <g clip-path="url(#tile)">
+    <!-- drawing space: 153 × 170 (the source artwork), scaled to a square tile -->
+    <g transform="scale(3.3464 3.0118)">
+      <rect x="-2" y="-2" width="157" height="174" fill="#C8712A"/>
+
+      <!-- ears -->
+      <path d="M-1,74 L3,14 Q5,3 17,6 Q42,16 66,34 Z" fill="#D27A2E"/>
+      <path d="M9,66 L11,21 Q12,12 21,15 Q38,24 54,36 Z" fill="#FDEACD"/>
+      <path d="M154,70 L151,15 Q149,4 137,8 Q114,18 92,34 Z" fill="#D27A2E"/>
+      <path d="M145,60 L142,22 Q141,13 132,16 Q117,25 101,37 Z" fill="#FDEACD"/>
+
+      <!-- head -->
+      <path d="M-2,80 C12,58 42,40 78,37 C112,34 140,46 155,66 L155,172 L-2,172 Z" fill="url(#face)"/>
+      <!-- lower fur shadows -->
+      <path d="M155,118 C146,142 128,160 96,172 L155,172 Z" fill="#D27A2E"/>
+      <path d="M155,132 C148,150 136,162 118,172 L155,172 Z" fill="#C46A22"/>
+      <path d="M-2,132 C6,146 16,160 30,172 L-2,172 Z" fill="#DE8030"/>
+
+      <!-- forehead stripes -->
+      <path d="M46,35 Q53,33 59,34 Q67,48 73,62 Q71,66 67,64 Q57,50 46,35 Z" fill="#C46A22"/>
+      <path d="M66,33 Q72,31 78,32 Q85,46 89,60 Q87,64 83,62 Q75,47 66,33 Z" fill="#C46A22"/>
+      <path d="M84,32 Q89,31 94,32 Q98,43 99,54 Q96,57 93,54 Q90,43 84,32 Z" fill="#C46A22"/>
+      <path d="M49,52 Q55,58 60,68" fill="none" stroke="#F8C27E" stroke-width="1.6" stroke-linecap="round" opacity="0.7"/>
+      <path d="M108,48 Q111,53 110,58" fill="none" stroke="#F8C27E" stroke-width="1.4" stroke-linecap="round" opacity="0.6"/>
+
+      <!-- cheek stripes -->
+      <path d="M2,92 Q12,86 27,86 Q16,92 4,99 Z" fill="#D27A2E"/>
+      <path d="M8,116 Q20,111 36,112 Q24,118 10,123 Z" fill="#D27A2E"/>
+      <path d="M155,74 Q146,72 138,74 Q146,78 155,83 Z" fill="#D27A2E"/>
+      <path d="M155,96 Q146,96 139,99 Q147,102 155,106 Z" fill="#D27A2E"/>
+
+      <!-- left eye -->
+      <ellipse cx="52" cy="91" rx="21.5" ry="17" fill="url(#irisL)" stroke="#7A4E22" stroke-width="1.4" transform="rotate(8 52 91)"/>
+      <ellipse cx="54.5" cy="87.5" rx="7.6" ry="11.6" fill="#45302A" transform="rotate(-8 54.5 87.5)"/>
+      <ellipse cx="55.5" cy="82" rx="2.6" ry="2" fill="#ECE6F2"/>
+      <path d="M30,88 C33,76 48,71 60,74 C68,76 73,84 74,96 L77,100 L73,99 C72,88 67,80 59,78 C47,75 35,80 32,90 Z" fill="#5B3A1E"/>
+      <path d="M31,92 C33,103 45,110 57,109 C64,108 69,104 72,99" fill="none" stroke="#8A5A26" stroke-width="1.2" stroke-linecap="round"/>
+
+      <!-- right eye -->
+      <ellipse cx="121" cy="79" rx="14.5" ry="17" fill="url(#irisL)" stroke="#7A4E22" stroke-width="1.4" transform="rotate(-6 121 79)"/>
+      <ellipse cx="118.5" cy="75" rx="6.8" ry="10.4" fill="#45302A" transform="rotate(-10 118.5 75)"/>
+      <ellipse cx="118" cy="70.5" rx="2.3" ry="1.8" fill="#ECE6F2"/>
+      <path d="M107,74 C108,65 115,61 123,62 C130,63 136,70 136,80 L135,83 C134,73 129,66 122,65 C115,64 110,69 109,77 Z" fill="#5B3A1E"/>
+      <path d="M107,78 C107,88 112,95 120,96 C128,97 134,91 136,83" fill="none" stroke="#8A5A26" stroke-width="1.2" stroke-linecap="round"/>
+
+      <!-- nose and mouth -->
+      <path d="M85,103 Q98,97 111,101 Q110,108 104,112 Q99,117 94,113 Q87,109 85,103 Z" fill="#F07E60"/><path d="M90,102 Q98,99 106,101" fill="none" stroke="#F7A890" stroke-width="1.2" stroke-linecap="round"/>
+      <path d="M88,106 Q91,104 95,107 Q91,109 88,106 Z" fill="#7A3E14"/>
+      <path d="M102,106 Q105,103 108,104 Q106,107 102,106 Z" fill="#7A3E14"/>
+      <path d="M99,114 L100,123 M100,123 Q94,127 87,134 M100,123 Q106,126 110,131" fill="none" stroke="#8A4A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+      <!-- whiskers -->
+      <g fill="none" stroke="#FDEBCD" stroke-width="1.7" stroke-linecap="round">
+        <path d="M63,120 Q30,122 -2,131"/>
+        <path d="M65,127 Q30,136 -2,153"/>
+        <path d="M65,133 Q40,148 21,171"/>
+        <path d="M126,111 Q140,108 155,108"/>
+        <path d="M126,118 Q140,118 155,122"/>
+        <path d="M127,125 Q140,130 153,140"/>
+      </g>
+    </g>
+  </g>
+</svg>

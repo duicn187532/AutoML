@@ -7,7 +7,7 @@ import hachimanAlert from '@/assets/brand/hachiman-alert.webp';
 import hachimanPeek from '@/assets/brand/hachiman-peek.webp';
 import hachimanPounce from '@/assets/brand/hachiman-pounce.webp';
 import heroTwoCats from '@/assets/brand/hero-two-cats.webp';
-import logoMark from '@/assets/brand/logo-mark.webp';
+import logoMark from '@/assets/brand/logo.svg';
 import oreiPortrait from '@/assets/brand/orei-portrait.webp';
 
 export const BRAND = {
