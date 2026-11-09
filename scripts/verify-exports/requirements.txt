@@ -1,0 +1,7 @@
+# Fixed versions for repeatable cross-runtime parity validation.
+numpy==1.26.4
+scikit-learn==1.6.1
+xgboost==2.1.4
+lightgbm==4.6.0
+onnx==1.17.0
+onnxruntime==1.20.1
