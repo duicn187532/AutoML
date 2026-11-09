@@ -283,3 +283,12 @@ textarea.code:focus { outline: none; box-shadow: inset 2px 0 0 var(--accent); }
   .model-card, .cell-out pre { font-size: 11px; }
 }
 @media (pointer: coarse) { .port { r: 11px; } }
+.sample-note { background: var(--bg); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; line-height: 1.5; }
+.sample-note a, td.cite a { word-break: break-all; }
+.sample-catalog summary { margin-top: 4px; }
+.sample-catalog .table-wrap { margin-top: 8px; max-height: 50vh; }
+.sample-catalog td { white-space: normal; vertical-align: top; }
+.sample-catalog td.cite { min-width: 260px; font-size: 12px; }
+.tpl-ref { background: var(--bg); border-left: 3px solid var(--accent); border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; line-height: 1.5; }
+.tpl-ref ul { margin: 4px 0 0; padding-left: 18px; }
+.tpl-ref a { word-break: break-word; }

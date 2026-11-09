@@ -12,7 +12,7 @@ import { Explore } from './Explore';
 import { useProfile, useTable } from './hooks';
 import { ColumnsTable, QualityReport } from './Overview';
 import { useT, type MessageKey } from '@/i18n';
-import { SAMPLES, sampleBytes } from './samples';
+import { SAMPLES, SAMPLE_GROUPS, sampleBytes, type Sample } from './samples';
 import { engineLoader } from '@/app/services';
 import { ACCEPTED_EXTENSIONS } from '@/core/data/formats';
 
@@ -24,6 +24,7 @@ function ImportBar() {
   const folderRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sample, setSample] = useState<Sample | null>(null);
   const run = async (fn: () => Promise<{ id: string }>) => {
     setBusy(true);
     setError(null);
@@ -64,12 +65,40 @@ function ImportBar() {
       <div className="spacer" />
       <select value="" disabled={busy} data-testid="sample-select" onChange={(e) => {
         const s = SAMPLES.find((x) => x.id === e.currentTarget.value);
-        if (s) void run(async () => importCsvFile(s.fileName, await sampleBytes(s, () => engineLoader.load('samples')), 'sample'));
+        if (s) { setSample(s); void run(async () => importCsvFile(s.fileName, await sampleBytes(s, (n) => engineLoader.load(n)), 'sample')); }
       }}>
         <option value="">{t('data.loadSample')}…</option>
-        {SAMPLES.map((s) => <option key={s.id} value={s.id}>{t.text(s.label)}</option>)}
+        {SAMPLE_GROUPS.map((g) => (
+          <optgroup key={g} label={t(`data.sampleGroup.${g}` as MessageKey)}>
+            {SAMPLES.filter((s) => s.group === g).map((s) => <option key={s.id} value={s.id}>{t.text(s.label)}</option>)}
+          </optgroup>
+        ))}
       </select>
       {error && <div className="error-text small full">{error}</div>}
+      {sample && !error && (
+        <div className="sample-note small full" data-testid="sample-note">
+          <div><strong>{t.text(sample.label)}</strong> · {t('lib.target')}: <code>{sample.target}</code></div>
+          {sample.hint && <div>{t.text(sample.hint)}</div>}
+          {sample.source && <div className="muted">{t('data.sampleSource')}: {sample.source.cite} · {sample.source.licence} · <a href={sample.source.url} target="_blank" rel="noopener noreferrer">{sample.source.url}</a></div>}
+        </div>
+      )}
+      <details className="full sample-catalog">
+        <summary>{t('data.sampleCatalog', { n: SAMPLES.length })}</summary>
+        <div className="table-wrap">
+          <table className="grid">
+            <thead><tr><th>{t('data.sampleName')}</th><th>{t('lib.target')}</th><th>{t('data.sampleSize')}</th><th>{t('data.sampleSource')}</th><th>{t('data.sampleLicence')}</th></tr></thead>
+            <tbody>
+              {SAMPLES.map((s) => (
+                <tr key={s.id}>
+                  <td>{t.text(s.label)}</td><td><code>{s.target}</code></td><td className="num">{s.size}</td>
+                  <td className="cite">{s.source ? <a href={s.source.url} target="_blank" rel="noopener noreferrer">{s.source.cite}</a> : t('data.sampleSynthetic')}</td>
+                  <td>{s.source?.licence ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

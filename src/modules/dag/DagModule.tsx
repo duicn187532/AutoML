@@ -7,6 +7,7 @@ import { useUi } from '@/app/stores/ui';
 import { EChart, type EChartsOption } from '@/charts/EChart';
 import { LiveCurve } from '@/charts/LiveCurve';
 import { graphToCode, type CodeTarget } from '@/core/dag/codegen';
+import { TEMPLATE_GROUPS, TEMPLATE_INFO } from './templateInfo';
 import { NODE_SPECS, analysisOk, analyze, template, type GNode, type Graph, type NodeType, type TemplateId } from '@/core/dag/graph';
 import type { DatasetRecord, GraphRecord } from '@/core/project/types';
 import { safeFileName } from '@/core/security/escape';
@@ -18,7 +19,7 @@ import { Canvas, NODE_H, NODE_W, fmtParams } from './Canvas';
 /** M0 / ADR 0002: browser training stays practical up to a few million parameters. */
 export const PARAM_LIMIT = 5_000_000;
 const PALETTE: NodeType[] = ['input', 'dense', 'dropout', 'batchnorm', 'activation', 'block', 'expert', 'gate', 'merge', 'head'];
-const TEMPLATES: TemplateId[] = ['mlp', 'wideDeep', 'residual', 'moe', 'moeTopK', 'ruleRouting', 'heteroMoe', 'multiTask'];
+const TEMPLATES = Object.keys(TEMPLATE_INFO) as TemplateId[];
 
 /** Approximate encoded input width from the dataset profile (numeric + indicators, one-hot ≤ 30 + other, dates × 4). */
 export function estimateDims(d: DatasetRecord, targets: string[]) {
@@ -104,8 +105,8 @@ export function DagModule() {
   const live = useTasks((s) => (taskId ? s.tasks.find((x) => x.id === taskId) : undefined));
   const points = useTasks((s) => (taskId ? s.points[taskId] : undefined));
 
-  const persist = useCallback((g: Graph) => { const next = { ...rec, graph: g, datasetId, updatedAt: Date.now() }; setRec(next); upsertGraph(next); }, [rec, datasetId, upsertGraph]);
-  const commit = useCallback((g: Graph) => { setUndo((u) => [...u.slice(-50), graph]); setRedo([]); persist(g); }, [graph, persist]);
+  const persist = useCallback((g: Graph, templateId?: TemplateId | null) => { const next = { ...rec, graph: g, datasetId, updatedAt: Date.now(), ...(templateId !== undefined ? { templateId: templateId ?? undefined } : {}) }; setRec(next); upsertGraph(next); }, [rec, datasetId, upsertGraph]);
+  const commit = useCallback((g: Graph, templateId?: TemplateId | null) => { setUndo((u) => [...u.slice(-50), graph]); setRedo([]); persist(g, templateId); }, [graph, persist]);
   const change = (g: Graph, isCommit: boolean) => {
     if (isCommit) commit(g);
     else { if (!before.current) before.current = graph; setRec((r) => ({ ...r, graph: g })); }
@@ -163,9 +164,13 @@ export function DagModule() {
       <div className="card">
         <div className="row">
           <select value={dataset.id} onChange={(e) => useUi.getState().selectDataset(e.currentTarget.value)}>{project.datasets.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-          <select value="" onChange={(e) => { if (e.currentTarget.value) { commit(template(e.currentTarget.value as TemplateId, [dataset.columns.at(-1)!.name, ...dataset.columns.slice(-3, -1).map((c) => c.name).reverse()], dims.features)); setSelected([]); } }} data-testid="dag-template">
+          <select value="" onChange={(e) => { if (e.currentTarget.value) { const id = e.currentTarget.value as TemplateId; commit(template(id, [dataset.columns.at(-1)!.name, ...dataset.columns.slice(-3, -1).map((c) => c.name).reverse()], dims.features), id); setSelected([]); } }} data-testid="dag-template">
             <option value="">{t('dag.templates')}…</option>
-            {TEMPLATES.map((k) => <option key={k} value={k}>{t(`dag.tpl.${k}` as MessageKey)}</option>)}
+            {TEMPLATE_GROUPS.map((g) => (
+              <optgroup key={g} label={t(`dag.tplGroup.${g}` as MessageKey)}>
+                {TEMPLATES.filter((k) => TEMPLATE_INFO[k].group === g).map((k) => <option key={k} value={k}>{t(`dag.tpl.${k}` as MessageKey)}</option>)}
+              </optgroup>
+            ))}
           </select>
           <button disabled={!undo.length} onClick={() => { setRedo((r) => [...r, graph]); persist(undo[undo.length - 1]); setUndo((u) => u.slice(0, -1)); }} title="Ctrl+Z">↶</button>
           <button disabled={!redo.length} onClick={() => { setUndo((u) => [...u, graph]); persist(redo[redo.length - 1]); setRedo((r) => r.slice(0, -1)); }} title="Ctrl+Y">↷</button>
@@ -180,6 +185,17 @@ export function DagModule() {
           }} />
           {(['keras', 'pytorch', 'tfjs'] as CodeTarget[]).map((ct) => <button key={ct} className="link" onClick={() => setCode({ target: ct, text: graphToCode(graph, ct, { inputDim: dims.inputDim, headDims, headTasks }) })}>{ct === 'tfjs' ? 'TF.js' : ct === 'keras' ? 'Keras' : 'PyTorch'}</button>)}
         </div>
+        {rec.templateId && TEMPLATE_INFO[rec.templateId as TemplateId] && (() => {
+          const info = TEMPLATE_INFO[rec.templateId as TemplateId];
+          return (
+            <div className="tpl-ref small" data-testid="dag-template-ref">
+              <strong>{t(`dag.tpl.${rec.templateId}` as MessageKey)}</strong> — {t.text(info.note)}
+              {info.refs.length > 0 && (
+                <ul>{info.refs.map((r) => <li key={r.url}>{t('dag.tplSource')}: <a href={r.url} target="_blank" rel="noopener noreferrer">{r.cite}</a></li>)}</ul>
+              )}
+            </div>
+          );
+        })()}
         <div className="palette">
           {PALETTE.map((k) => <button key={k} onClick={() => addNode(k)} data-testid={`add-${k}`}>+ {t(`dag.node.${k}` as MessageKey)}</button>)}
         </div>

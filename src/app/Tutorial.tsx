@@ -31,7 +31,7 @@ export function Tutorial({ onClose }: { onClose: () => void }) {
       setBusy(true);
       try {
         const s = SAMPLES.find((x) => x.id === 'titanic')!;
-        const d = await importCsvFile(s.fileName, await sampleBytes(s, () => engineLoader.load('samples')), 'sample');
+        const d = await importCsvFile(s.fileName, await sampleBytes(s, (n) => engineLoader.load(n)), 'sample');
         useUi.getState().selectDataset(d.id);
       } finally { setBusy(false); }
     }

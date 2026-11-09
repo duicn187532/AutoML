@@ -23,10 +23,10 @@ export interface NodeSpec {
 
 export const NODE_SPECS: Record<NodeType, NodeSpec> = {
   input: { type: 'input', defaults: {}, maxInputs: 0 },
-  dense: { type: 'dense', defaults: { units: 64, activation: 'relu', l2: 0 }, enums: { activation: ['relu', 'elu', 'tanh', 'sigmoid', 'linear', 'gelu'] }, maxInputs: 1 },
+  dense: { type: 'dense', defaults: { units: 64, activation: 'relu', l2: 0 }, enums: { activation: ['relu', 'elu', 'selu', 'tanh', 'sigmoid', 'linear', 'gelu'] }, maxInputs: 1 },
   dropout: { type: 'dropout', defaults: { rate: 0.2 }, maxInputs: 1 },
   batchnorm: { type: 'batchnorm', defaults: {}, maxInputs: 1 },
-  activation: { type: 'activation', defaults: { fn: 'relu' }, enums: { fn: ['relu', 'elu', 'tanh', 'sigmoid', 'gelu'] }, maxInputs: 1 },
+  activation: { type: 'activation', defaults: { fn: 'relu' }, enums: { fn: ['relu', 'elu', 'selu', 'tanh', 'sigmoid', 'gelu'] }, maxInputs: 1 },
   block: { type: 'block', defaults: { kind: 'mlp', units: 64, layers: 2, dropout: 0.1 }, enums: { kind: ['mlp', 'residual', 'cnn', 'lstm', 'transformer'] }, maxInputs: 1 },
   expert: { type: 'expert', defaults: { model: 'neural', units: 64, layers: 2, dropout: 0.1 }, enums: { model: ['neural', 'xgboost', 'lightgbm', 'random_forest', 'hist_gbdt', 'logistic', 'ridge'] }, maxInputs: 1 },
   gate: { type: 'gate', defaults: { mode: 'soft', k: 1, balance: 0.01, ruleFeature: '', ruleThreshold: 0, hidden: 0 }, enums: { mode: ['soft', 'topk', 'rule'] }, maxInputs: 16, hasCtrl: true },
@@ -205,7 +205,8 @@ function edge(t: T, from: string, to: string, port: Port = 'in') {
   t.edges.push({ id: nid('e'), from, to, port });
 }
 
-export type TemplateId = 'mlp' | 'wideDeep' | 'moe' | 'moeTopK' | 'ruleRouting' | 'heteroMoe' | 'multiTask' | 'residual';
+export type TemplateId = 'mlp' | 'wideDeep' | 'moe' | 'moeTopK' | 'ruleRouting' | 'heteroMoe' | 'multiTask' | 'residual'
+  | 'resnetTab' | 'snn' | 'denseNet' | 'inception' | 'switch' | 'mmoe';
 
 export function template(id: TemplateId, targets: string[], features: string[]): Graph {
   tid = 0;
@@ -256,6 +257,64 @@ export function template(id: TemplateId, targets: string[], features: string[]):
       (targets.length > 1 ? targets.slice(0, 3) : [target]).forEach((tg, i) => {
         const tower = node(t, 'dense', 540, 80 + i * 150, { units: 32 }, `tower ${tg}`);
         edge(t, shared, tower); headAt(tower, 760, 80 + i * 150, tg);
+      });
+      break;
+    }
+    case 'resnetTab': {
+      // Gorishniy et al. 2021: Linear → N × [BN → Linear → ReLU → Dropout → Linear → Dropout] + skip → BN → ReLU → Linear
+      const stem = node(t, 'dense', 240, 200, { units: 128, activation: 'linear' }, 'linear stem');
+      edge(t, inp, stem);
+      let prev = stem;
+      for (let i = 0; i < 3; i++) { const b = node(t, 'block', 420 + i * 170, 200, { kind: 'residual', units: 128, layers: 2, dropout: 0.1 }, `ResNet block ${i + 1}`); edge(t, prev, b); prev = b; }
+      const bn = node(t, 'batchnorm', 930, 120), a = node(t, 'activation', 930, 280, { fn: 'relu' });
+      edge(t, prev, bn); edge(t, bn, a); headAt(a, 1110, 200);
+      break;
+    }
+    case 'snn': {
+      // Klambauer et al. 2017: SELU dense layers (self-normalising), small dropout
+      let prev = inp;
+      for (let i = 0; i < 4; i++) { const d = node(t, 'dense', 240 + i * 170, i % 2 ? 280 : 120, { units: 128, activation: 'selu' }, `SELU ${i + 1}`); edge(t, prev, d); prev = d; }
+      const dr = node(t, 'dropout', 920, 200, { rate: 0.05 }); edge(t, prev, dr); headAt(dr, 1100, 200);
+      break;
+    }
+    case 'denseNet': {
+      // Huang et al. 2017: each layer receives the concatenation of all earlier feature maps
+      const l1 = node(t, 'dense', 260, 60, { units: 32 }, 'layer 1');
+      edge(t, inp, l1);
+      const c1 = node(t, 'merge', 440, 140, { mode: 'concat' }, 'concat [x, h1]'); edge(t, inp, c1); edge(t, l1, c1);
+      const l2 = node(t, 'dense', 620, 60, { units: 32 }, 'layer 2'); edge(t, c1, l2);
+      const c2 = node(t, 'merge', 800, 200, { mode: 'concat' }, 'concat [x, h1, h2]'); edge(t, inp, c2); edge(t, l1, c2); edge(t, l2, c2);
+      const l3 = node(t, 'dense', 980, 200, { units: 64 }, 'transition'); edge(t, c2, l3); headAt(l3, 1160, 200);
+      break;
+    }
+    case 'inception': {
+      // Szegedy et al. 2015: parallel branches of different depth/width, concatenated
+      const br = [
+        node(t, 'dense', 300, 40, { units: 32 }, 'branch 1 (1 layer)'),
+        node(t, 'block', 300, 160, { kind: 'mlp', units: 32, layers: 2, dropout: 0 }, 'branch 2 (2 layers)'),
+        node(t, 'block', 300, 280, { kind: 'mlp', units: 32, layers: 3, dropout: 0 }, 'branch 3 (3 layers)'),
+        node(t, 'dense', 300, 400, { units: 32, activation: 'linear' }, 'branch 4 (linear)'),
+      ];
+      const m = node(t, 'merge', 560, 220, { mode: 'concat' }, 'filter concat');
+      for (const b of br) { edge(t, inp, b); edge(t, b, m); }
+      const top = node(t, 'dense', 760, 220, { units: 64 }); edge(t, m, top); headAt(top, 940, 220);
+      break;
+    }
+    case 'switch': {
+      // Fedus et al. 2021/2022: top-1 routing over many experts with a load-balancing loss
+      const g = node(t, 'gate', 600, 260, { mode: 'topk', k: 1, balance: 0.01, hidden: 0 }, 'switch router (top-1)');
+      for (let i = 0; i < 8; i++) { const e = node(t, 'expert', 330, 10 + i * 68, { model: 'neural', units: 32, layers: 1, dropout: 0.1 }, `expert ${i + 1}`); edge(t, inp, e); edge(t, e, g); }
+      edge(t, inp, g, 'ctrl'); headAt(g, 820, 260);
+      break;
+    }
+    case 'mmoe': {
+      // Ma et al. 2018: shared experts, one softmax gate + tower per task
+      const ex = [0, 1, 2].map((i) => { const e = node(t, 'expert', 300, 60 + i * 150, { model: 'neural', units: 64, layers: 2 }, `shared expert ${i + 1}`); edge(t, inp, e); return e; });
+      (targets.length > 1 ? targets.slice(0, 2) : [target]).forEach((tg, k) => {
+        const g = node(t, 'gate', 560, 80 + k * 260, { mode: 'soft', hidden: 0, balance: 0 }, `gate ${tg}`);
+        for (const e of ex) edge(t, e, g);
+        edge(t, inp, g, 'ctrl');
+        const tower = node(t, 'dense', 780, 80 + k * 260, { units: 32 }, `tower ${tg}`); edge(t, g, tower); headAt(tower, 980, 80 + k * 260, tg);
       });
       break;
     }
