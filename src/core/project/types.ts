@@ -34,6 +34,8 @@ export interface GraphRecord {
   name: string;
   datasetId?: string;
   graph: import('../dag/graph').Graph;
+  /** Template the graph was started from (shows its citation). */
+  templateId?: string;
   updatedAt: number;
 }
 

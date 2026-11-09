@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { EngineSpec } from './vite-plugin-engine-pack.ts';
 import { PY_PACK_GROUPS } from './pyodide-packs.mjs';
@@ -41,11 +41,10 @@ export function engineSpecs(): EngineSpec[] {
     bootstrap: ['xlsx.full.min.js'],
   });
 
-  // Larger sample datasets (tutorial) — loaded only when the user picks one
-  specs.push({
-    name: 'samples', version: '1', bootstrap: [],
-    files: ['iris.csv', 'titanic.csv', 'house-prices-train.csv'].map((f) => ({ path: join('samples', f), as: f, kind: 'data' as const })),
-  });
+  // Sample datasets — one small pack each, loaded only when the user picks that dataset
+  for (const f of readdirSync('samples').filter((x) => x.endsWith('.csv') && !x.startsWith('collateral-') && x !== 'house-prices-test.csv').sort()) {
+    specs.push({ name: `sample-${f.replace(/\.csv$/, '')}`, version: '1', bootstrap: [], files: [{ path: join('samples', f), as: f, kind: 'data' as const }] });
+  }
 
   const pyDir = pkgDir('pyodide');
   const pyVersion = pkgVersion('pyodide');
