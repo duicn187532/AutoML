@@ -14,6 +14,7 @@ import { useProfile, useTable } from './hooks';
 import { ColumnsTable, QualityReport } from './Overview';
 import { useT, type MessageKey } from '@/i18n';
 import { PageHeader } from '@/app/ui/Page';
+import { BRAND } from '@/app/brand';
 import { inferTask } from '@/core/ml/preprocess';
 import { SAMPLES, SAMPLE_GROUPS, sampleBytes, type Sample } from './samples';
 import { engineLoader } from '@/app/services';
@@ -153,7 +154,7 @@ function ImportHero({ imp }: { imp: Importer }) {
           <button className="primary big" disabled={imp.busy} onClick={() => inputRef.current?.click()}>{imp.busy ? '…' : t('data.import')}</button>
           <button className="big" disabled={imp.busy} onClick={() => folderRef.current?.click()} data-testid="img-folder">{t('img.importFolder')}</button>
         </div>
-        <p className="small muted">{t('data.hero.private')}</p>
+        <span className="orei-pill"><img src={BRAND.orei} alt="" />{t('data.hero.oreiPromise')}</span>
         <FileInputs imp={imp} inputRef={inputRef} folderRef={folderRef} />
       </div>
       {imp.error && <div className="error-text">{imp.error}</div>}
@@ -204,9 +205,10 @@ function NextStep({ target, table }: { target: string; table: ColumnarTable | nu
   const task = inferTask(getColumn(table, target));
   return (
     <div className="next-step" data-testid="next-step">
+      <img className="next-step-art" src={BRAND.peek} alt="" />
       <div className="next-step-text">
         <strong>{t('data.next.title')}</strong>
-        <span>{t('data.next.body', { target, task: t(`task.kind.${task}` as MessageKey) })}</span>
+        <span>{t('data.next.ready')} {t('data.next.body', { target, task: t(`task.kind.${task}` as MessageKey) })}</span>
       </div>
       <button className="primary" onClick={() => useUi.getState().setModule('auto')} data-testid="next-auto">{t('data.next.auto')} →</button>
       <button onClick={() => useUi.getState().setModule('library')}>{t('data.next.library')}</button>
@@ -269,7 +271,7 @@ export function DataModule() {
 
   return (
     <div className="module">
-      <PageHeader id="data" />
+      <PageHeader id="data" art={dataset ? undefined : BRAND.hero} banner />
       {!dataset ? (
         <ImportHero imp={imp} />
       ) : (

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { EChart, type EChartsOption } from '@/charts/EChart';
 import type { ExperimentRecord } from '@/core/project/types';
 import { useT } from '@/i18n';
+import { CHART } from '@/charts/palette';
 
 /** Binary classification: decision-threshold slider (confusion / precision / recall / F1) + calibration curve. */
 export function ThresholdPanel({ exp }: { exp: ExperimentRecord }) {
@@ -22,7 +23,7 @@ export function ThresholdPanel({ exp }: { exp: ExperimentRecord }) {
       xAxis: { type: 'value', min: 0, max: 1, name: 'predicted', nameLocation: 'middle', nameGap: 25 },
       yAxis: { type: 'value', min: 0, max: 1, name: 'observed' },
       series: [
-        { type: 'line', data: pts.map((p) => [p[0], p[1]]), symbolSize: (_v: unknown, params: { dataIndex: number }) => 4 + Math.sqrt(pts[params.dataIndex][2]), itemStyle: { color: '#2563eb' } },
+        { type: 'line', data: pts.map((p) => [p[0], p[1]]), symbolSize: (_v: unknown, params: { dataIndex: number }) => 4 + Math.sqrt(pts[params.dataIndex][2]), itemStyle: { color: CHART.primary } },
         { type: 'line', data: [[0, 0], [1, 1]], showSymbol: false, lineStyle: { type: 'dashed', opacity: 0.5 } },
       ],
     };

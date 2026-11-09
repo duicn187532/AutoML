@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { safeFileName } from '@/core/security/escape';
 import { LOCALES, useLocale, useT } from '@/i18n';
 import { downloadBytes } from './actions';
+import { BRAND } from './brand';
 import { Tutorial, shouldAutoOpenTutorial } from './Tutorial';
 import { useProject } from './stores/project';
 import { useTasks } from './stores/tasks';
@@ -55,10 +56,11 @@ export function TopBar() {
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="logo" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2l2.6 7.4L22 12l-7.4 2.6L12 22l-2.6-7.4L2 12l7.4-2.6z" fill="currentColor" /></svg>
+        <img className="logo" src={BRAND.logo} alt={BRAND.name} />
+        <span className="brand-text">
+          <span className="brand-product">{t('app.title')}</span>
+          <span className="brand-studio">{BRAND.name}</span>
         </span>
-        <span className="brand-text">{t('app.title')}</span>
       </div>
       <span className="brand-sep" aria-hidden="true" />
       <input

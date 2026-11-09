@@ -13,7 +13,8 @@ import { safeFileName } from '@/core/security/escape';
 import type { AutoOutput } from '@/core/workers/types';
 import { useT, type MessageKey } from '@/i18n';
 import { useLeakage, useTable } from '../data/hooks';
-import { NeedData, PageHeader } from '@/app/ui/Page';
+import { MascotNote, NeedData, PageHeader } from '@/app/ui/Page';
+import { BRAND } from '@/app/brand';
 
 const BUDGET: Record<Preset, number> = { fast: 60, balanced: 300, best: 900 };
 
@@ -62,7 +63,7 @@ export function AutoModule() {
   const metrics = task === 'regression' ? REGRESSION_METRICS : CLASSIFICATION_METRICS;
   return (
     <div className="module">
-      <PageHeader id="auto" />
+      <PageHeader id="auto" art={BRAND.pounce} />
       <div className="card form auto-form">
         <div className="form-grid">
           <div className="field">
@@ -90,11 +91,12 @@ export function AutoModule() {
           </div>
         )}
         {leak.columns.length > 0 && (
-          <div className="advice warn" data-testid="leak-note">
-            ⚠ {t(keepLeak ? 'auto.leakKept' : 'auto.leakExcluded', { cols: leak.columns.join(', ') })}{' '}
+          <MascotNote who="hachiman" testId="leak-note" title={t(keepLeak ? 'auto.leakKeptTitle' : 'auto.leakTitle', { cols: leak.columns.join(', ') })}>
+            {t(keepLeak ? 'auto.leakKeptWhy' : 'auto.leakWhy')}{' '}
             <button className="link" onClick={() => setKeepLeakFor(keepLeak ? null : `${dataset.id}|${target}`)}>{t(keepLeak ? 'auto.leakExclude' : 'auto.leakKeep')}</button>
-          </div>
+          </MascotNote>
         )}
+        <h3 className="presets-title">{t('auto.presetsTitle')}</h3>
         <div className="presets" role="radiogroup">
           {(['fast', 'balanced', 'best'] as Preset[]).map((p) => (
             <label key={p} className={preset === p ? 'preset active' : 'preset'}>
@@ -119,7 +121,7 @@ export function AutoModule() {
           <p className="small muted">{t('auto.how')}</p>
         </details>
         <div className="form-actions">
-          <button className="primary big" disabled={running || !table || !leak.ready} onClick={run} data-testid="auto-run">{running ? t('lib.training') : `▶ ${t('auto.run')}`}</button>
+          <button className="primary big" disabled={running || !table || !leak.ready} onClick={run} data-testid="auto-run">{running ? t('lib.training') : `${t('auto.run')} →`}</button>
         </div>
         {error && <div className="error-text">{error}</div>}
       </div>

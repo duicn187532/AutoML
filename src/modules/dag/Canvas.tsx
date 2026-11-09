@@ -6,8 +6,8 @@ import { newId } from '@/core/util/id';
 
 export const NODE_W = 180, NODE_H = 62;
 const COLORS: Record<GNode['type'], string> = {
-  input: '#0891b2', dense: '#2563eb', dropout: '#64748b', batchnorm: '#64748b', activation: '#64748b', block: '#7c3aed',
-  expert: '#c2410c', gate: '#db2777', merge: '#16a34a', head: '#ca8a04',
+  input: '#4A6C8C', dense: '#C86A2D', dropout: '#A8998B', batchnorm: '#A8998B', activation: '#A8998B', block: '#8A5A7A',
+  expert: '#B5473A', gate: '#D9A23F', merge: '#6B7A4F', head: '#3B312A',
 };
 
 const portPos = (n: GNode, port: Port | 'out') =>
@@ -97,7 +97,7 @@ export function Canvas({ graph, analysis, selected, onSelect, onChange, onMoveEn
           return (
             <g key={e.id} className="dag-edge" onPointerDown={(ev) => { ev.stopPropagation(); onSelect([e.id]); }}>
               <path d={edgePath(portPos(a, 'out'), portPos(b, e.port), e.port === 'ctrl')} stroke="transparent" strokeWidth={12} fill="none" />
-              <path d={edgePath(portPos(a, 'out'), portPos(b, e.port), e.port === 'ctrl')} stroke={sel ? 'var(--accent)' : e.port === 'ctrl' ? '#db2777' : 'var(--muted)'} strokeWidth={sel ? 2.5 : 1.6} strokeDasharray={e.port === 'ctrl' ? '5 4' : undefined} fill="none" markerEnd="url(#arrow)" />
+              <path d={edgePath(portPos(a, 'out'), portPos(b, e.port), e.port === 'ctrl')} stroke={sel ? 'var(--accent)' : e.port === 'ctrl' ? '#D9A23F' : 'var(--muted)'} strokeWidth={sel ? 2.5 : 1.6} strokeDasharray={e.port === 'ctrl' ? '5 4' : undefined} fill="none" markerEnd="url(#arrow)" />
               <text x={(portPos(a, 'out').x + portPos(b, e.port).x) / 2} y={(portPos(a, 'out').y + portPos(b, e.port).y) / 2 - 6} className="dag-shape">{analysis.info[e.from]?.out ?? '?'}</text>
             </g>
           );

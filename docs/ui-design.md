@@ -73,23 +73,48 @@ Every page uses the same skeleton:
   A visible notice explains this and can be overridden. Auto Train waits for the (≈30 ms) profile before enabling Run.
 * Profiles are cached per table and target (`WeakMap`), so moving between pages does not queue repeated "profile" tasks.
 
-## 6. Visual system (`src/styles.css`)
+## 6. Visual system: HACHIMAN STUDIO brand (`src/styles.css`, `src/app/brand.ts`)
+
+The UI uses the HACHIMAN STUDIO (八萬工作室) brand pack. Assets and the fixes applied to them are listed in
+`src/assets/brand/README.md`.
+
+**Characters have jobs.**
+
+| | Role in the product | Where it appears |
+|---|---|---|
+| 八萬 (orange tabby, agile and curious) | does the active work: training, searching, spotting problems | Auto Train header (crouching, ready to pounce), leakage warnings ("八萬發現了…"), the "next step" prompt (peeking) |
+| 歐雷 (white cat, calm and reliable) | keeps things safe: data checks, privacy | quality report ("歐雷檢查完了"), the privacy promise on the import area, the "needs data" empty state |
+| Both together | rest and completion | the empty Results page; the main visual on the first-run Data page |
+
+Illustrations appear only where people pause (headers, empty states, notices), never inside forms or tables.
+
+**Workflow as paw prints.** The three steps in the rail (and the phone tab bar) are paw prints:
+- filled accent: the current step;
+- soft ginger: a step already done;
+- pale: a step not reached yet.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--bg` / `--panel` / `--panel-2` | #f4f6fa / #fff / #f8f9fc | #0f1218 / #171b23 / #1c212b | page / cards / insets, table heads |
-| `--accent` / `--accent-soft` / `--accent-text` | #2563eb / #eaf1ff / #1e40af | #6d9bff / #1c2742 / #b9cdff | primary action, selection, chips |
-| `--ok`, `--warn`, `--danger` (+ `-soft`) | green / amber / red | lighter tints | badges, advice, destructive actions |
-| `--radius` / `--radius-sm` | 12 px / 8 px | | cards / controls |
-| `--shadow-sm` / `--shadow-md` | | | cards / popovers |
+| `--bg` | Cream #F6E7D6 | #241E1A | page |
+| `--panel` / `--panel-2` | Orei White #FDFDFC / #FBF3EA | #2F2721 / #3A3029 | cards / insets |
+| `--text` / `--muted` | Charcoal #3B312A / #6E5F53 | #F6E7D6 / #C2AE9A | text (5.0:1+ on cream) |
+| `--accent` | #A9531C (Ginger darkened, white text 5.3:1) | #E08A4E (dark text) | the one primary button per screen, current step |
+| `--accent-text` | #93461A (5.5:1 on cream) | #F0A673 | links, "注意" labels |
+| `--ginger` | Ginger #C86A2D | #E08A4E | illustrations, progress bars, energy lines, tab underline: never small text (3.8:1) |
+| `--ok` / `--ok-soft` | #5B6448 / #E3E7D9 (from Sage #9BA487) | #B9C49F / #343A2A | "已處理", saved state |
+| `--radius` / `--radius-sm` | 20 px / 12 px (buttons 12–14 px) | | echoes the rounded-square logo |
 
-* Controls are 34 px high (38 px on a phone) and inputs 16 px on a phone, so iOS does not zoom.
-* A focus ring (`box-shadow: 0 0 0 3px var(--accent-soft)`) is shown on every input.
-* Each screen has exactly one filled (primary) button. Secondary buttons are outlined, tertiary ones are text links, and `ghost` buttons are used in the top bar.
-* Status always pairs text with a colour (badges, advice boxes, save dot plus label), so colour is never the only signal.
+* **Type.** Lato 400/700/900 (Latin subset, ≈ 70 KB, embedded as data: URLs because `file://` blocks font files) for Latin text and numbers. Headings are weight 900.
+  Chinese uses the system's Traditional Chinese fonts (PingFang TC, Noto Sans TC, Microsoft JhengHei). Bundling Noto Sans TC would add several MB.
+* **Charts** use `src/charts/palette.ts`:
+  * single series in ginger;
+  * categorical series that also differ in lightness;
+  * signed values in orange (+) vs slate blue (−), never red/green.
+* **Hand-drawn energy lines** (from the main visual) sit next to page titles. They are redrawn as SVG because the pack's traced version is broken.
+* Each screen keeps exactly one filled (primary) button. Status always pairs text with colour.
 * Breakpoints:
   * ≤ 1100 px: the side panel becomes a drawer and forms use a single column.
-  * ≤ 760 px: bottom tab bar, compact top bar, sheet-style modals.
+  * ≤ 760 px: bottom tab bar (three paw steps plus More), compact top bar, sheet-style modals.
 
 ## 7. Trade-offs
 
@@ -100,6 +125,8 @@ Every page uses the same skeleton:
 | Leakage columns excluded by default | Prevents the most common beginner mistake (a 100 % score that cannot be used) | The screen is a heuristic and could drop a legitimate strong feature. The notice names the column and gives one-click "use them anyway". |
 | Shared target per dataset | Choose once; every page agrees | Trying a different target in the Library also changes Auto Train's default. This is intended and visible, since the picker is on every page. |
 | Plain CSS with tokens (no UI framework) | Bundle stays small, works on `file://`, no new dependency | Components are hand-styled. Tokens keep them consistent. |
+| Brand images and Lato embedded in the bundle | Works offline from `file://` (no CORS for fonts) | About 170 KB larger bundle. Images are WebP, each ≤ 50 KB. |
+| No bundled Chinese web font | Saves several MB | Chinese headings use the OS font, so weight 900 may render as bold on some systems. |
 
 ## 8. What to revisit as the product grows
 

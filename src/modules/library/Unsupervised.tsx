@@ -9,6 +9,7 @@ import type { Column, ColumnarTable } from '@/core/data/table';
 import type { DatasetRecord } from '@/core/project/types';
 import type { UnsupervisedMethod, UnsupervisedOutput } from '@/core/workers/types';
 import { useT, type MessageKey } from '@/i18n';
+import { CHART } from '@/charts/palette';
 
 const METHODS: { id: UnsupervisedMethod; group: 'cluster' | 'reduce' | 'anomaly'; params: Record<string, number | string> }[] = [
   { id: 'kmeans', group: 'cluster', params: { k: 3 } },
@@ -21,7 +22,7 @@ const METHODS: { id: UnsupervisedMethod; group: 'cluster' | 'reduce' | 'anomaly'
   { id: 'lof', group: 'anomaly', params: { contamination: 0.05, neighbors: 20 } },
   { id: 'autoencoder', group: 'anomaly', params: { contamination: 0.05, hidden: 32, epochs: 80 } },
 ];
-const PALETTE = ['#2563eb', '#ea580c', '#16a34a', '#9333ea', '#dc2626', '#0891b2', '#ca8a04', '#db2777', '#64748b', '#0d9488'];
+const PALETTE = CHART.series;
 
 function scatter(o: UnsupervisedOutput, colorBy?: number[]): EChartsOption {
   const pts = Array.from({ length: o.embedding.length / 2 }, (_, i) => [o.embedding[2 * i], o.embedding[2 * i + 1]]);
@@ -33,7 +34,7 @@ function scatter(o: UnsupervisedOutput, colorBy?: number[]): EChartsOption {
     grid: { left: 40, right: 20, top: 30, bottom: 30 }, xAxis: { scale: true, name: 'dim 1' }, yAxis: { scale: true, name: 'dim 2' },
     series: keys.map((k, i) => ({
       type: 'scatter', symbolSize: 5, name: o.anomaly ? (k ? 'anomaly' : 'normal') : k < 0 ? 'noise' : `cluster ${k}`,
-      itemStyle: { color: o.anomaly ? (k ? '#dc2626' : '#94a3b8') : k < 0 ? '#94a3b8' : PALETTE[i % PALETTE.length], opacity: 0.75 },
+      itemStyle: { color: o.anomaly ? (k ? CHART.primary : CHART.muted) : k < 0 ? CHART.muted : PALETTE[i % PALETTE.length], opacity: 0.75 },
       data: pts.filter((_, r) => groups[r] === k),
     })),
   };

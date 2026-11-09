@@ -22,7 +22,7 @@ import { getPlugin, listPlugins } from '@/core/models/registry';
 import type { ParamValues } from '@/core/models/types';
 import type { DatasetRecord, ExperimentRecord } from '@/core/project/types';
 import { datasetTarget } from '@/core/project/target';
-import { NeedData, PageHeader } from '@/app/ui/Page';
+import { MascotNote, NeedData, PageHeader } from '@/app/ui/Page';
 import { useLeakage } from '../data/hooks';
 import { getColumn, type ColumnarTable } from '@/core/data/table';
 import { useT, type MessageKey } from '@/i18n';
@@ -289,7 +289,7 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
             </div>
           </details>
           {leak.columns.length > 0 && leak.columns.every((c) => !features.includes(c)) && (
-            <div className="advice warn" data-testid="leak-note">⚠ {t('auto.leakExcluded', { cols: leak.columns.join(', ') })}</div>
+            <MascotNote who="hachiman" testId="leak-note" title={t('auto.leakTitle', { cols: leak.columns.join(', ') })}>{t('auto.leakWhy')}</MascotNote>
           )}
           <div className="form-section">{t('lib.sectionModel')}</div>
           <div className="field">

@@ -23,6 +23,7 @@ import { newId } from '@/core/util/id';
 import type { TrainGraphOutput } from '@/core/workers/types';
 import { useT, type MessageKey } from '@/i18n';
 import { Canvas, NODE_H, NODE_W, fmtParams } from './Canvas';
+import { CHART } from '@/charts/palette';
 
 /** M0 / ADR 0002: browser training stays practical up to a few million parameters. */
 export const PARAM_LIMIT = 5_000_000;
@@ -82,8 +83,8 @@ function gateOption(stats: TrainGraphOutput['gates'][string], labels: string[]):
     xAxis: { type: 'category', data: labels },
     yAxis: { type: 'value', max: 1 },
     series: [
-      { name: 'share of samples', type: 'bar', data: stats.share.map((x) => +x.toFixed(3)), itemStyle: { color: '#db2777' } },
-      { name: 'mean weight', type: 'bar', data: stats.meanWeight.map((x) => +x.toFixed(3)), itemStyle: { color: '#f9a8d4' } },
+      { name: 'share of samples', type: 'bar', data: stats.share.map((x) => +x.toFixed(3)), itemStyle: { color: CHART.primary } },
+      { name: 'mean weight', type: 'bar', data: stats.meanWeight.map((x) => +x.toFixed(3)), itemStyle: { color: CHART.primarySoft } },
     ],
   };
 }

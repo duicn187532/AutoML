@@ -37,7 +37,7 @@
 - 第一次使用 Python 模型會冷啟動 Pyodide 約 10 秒；同一時間只保留一個 Python worker。
 - 建議資料量上限：GBDT 約 50 萬列 × 20 欄（約 20–30 秒、0.5 GB）；網路參數量超過 500 萬會警示（[ADR 0002](docs/decisions/0002-engines-and-limits.md)）。
 - 哪些資料 / 任務不適合哪種模型、需要哪些前處理：見 [模型 × 資料相容性](docs/model-compatibility.md)（17 個模型 × 14 個資料集實測）。
-- 介面設計原則、資訊架構與取捨：見 [UI / UX 設計](docs/ui-design.md)。
+- 介面設計原則、資訊架構與取捨：見 [UI / UX 設計](docs/ui-design.md)。介面採用 **HACHIMAN STUDIO（八萬工作室）** 品牌：八萬負責訓練與抓問題、歐雷負責檢查資料與隱私（素材說明見 `src/assets/brand/README.md`，品牌素材不適用本專案的 AGPL 授權）。
 - 取消正在執行的 Python 訓練會重啟 worker（瀏覽器沒有可中斷 Python 的機制）。
 - 尚未提供：文字 embedding 模型（目前用 TF-IDF）、GAN / GNN / 強化學習 / 音訊、ONNX 匯出 ensemble。見 [ROADMAP](docs/ROADMAP.md)、[ADR 0003](docs/decisions/0003-deferred-items.md)。
 
