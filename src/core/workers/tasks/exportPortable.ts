@@ -12,7 +12,7 @@ export interface PortableBundle {
   target: { column: string; classes?: string[]; mean?: number; std?: number };
   /** raw feature columns the predictor asks for */
   features: { name: string; kind: 'numeric' | 'categorical' | 'datetime'; categories?: string[] }[];
-  members: { weight: number; prep: PreprocessorState; model: unknown }[];
+  members: { weight: number; prep: PreprocessorState; model: unknown; targetScale?: { mean: number; std: number } }[];
 }
 
 interface Layer { class_name: string; config: { name: string; activation?: string } }
@@ -80,11 +80,17 @@ export async function exportPortableTask(input: { model: Uint8Array }, ctx: Task
   const blob = decodeBinJson<{ artifact: ModelArtifact; preprocessor: PreprocessorState; target: TargetState } | { kind: 'bagged-ensemble'; task: string; target: TargetState; members: BaggedMember[] }>(input.model);
   const target = blob.target;
   const parts = 'kind' in blob
-    ? blob.members.flatMap((m) => m.folds.map((f) => ({ weight: m.weight / m.folds.length, art: f.artifact, prep: f.preprocessor })))
-    : [{ weight: 1, art: blob.artifact, prep: blob.preprocessor }];
+    ? blob.members.flatMap((m) => m.folds.map((f) => ({
+      weight: m.weight / m.folds.length, art: f.artifact, prep: f.preprocessor, target: f.target ?? blob.target,
+    })))
+    : [{ weight: 1, art: blob.artifact, prep: blob.preprocessor, target: blob.target }];
   const members: PortableBundle['members'] = [];
   for (const [i, p] of parts.entries()) {
-    members.push({ weight: p.weight, prep: p.prep, model: await toPortable(p.art, ctx) });
+    if (target.task === 'regression' && p.target.task !== 'regression') throw new Error('Regression fold is missing its target scaling');
+    members.push({
+      weight: p.weight, prep: p.prep, model: await toPortable(p.art, ctx),
+      ...(p.target.task === 'regression' ? { targetScale: { mean: p.target.mean, std: p.target.std } } : {}),
+    });
     ctx.progress({ fraction: (i + 1) / parts.length });
   }
   return {

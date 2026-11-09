@@ -98,7 +98,7 @@ export async function autoTask(input: AutoInput, ctx: TaskContext): Promise<Auto
         c.predictMsPer1k = ((performance.now() - t2) / test.length) * 1000;
       }
       const artifact = await r.model.export();
-      c.member.folds.push({ preprocessor: r.prep, artifact });
+      c.member.folds.push({ preprocessor: r.prep, artifact, target: r.target });
       r.model.dispose?.();
       await ctx.checkpoint();
     }

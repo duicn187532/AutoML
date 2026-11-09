@@ -147,7 +147,8 @@ export interface BaggedMember {
   pluginId: string;
   params: ParamValues;
   weight: number;
-  folds: { preprocessor: PreprocessorState; artifact: ModelArtifact }[];
+  /** Per-fold regression scaling is required before ensemble averaging. Optional for legacy saved projects. */
+  folds: { preprocessor: PreprocessorState; artifact: ModelArtifact; target?: TargetState }[];
 }
 
 export interface AutoOutput {

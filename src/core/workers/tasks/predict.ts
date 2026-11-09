@@ -36,9 +36,12 @@ async function scoreOne(art: ModelArtifact, prep: PreprocessorState, input: Pred
 export async function predictTask(input: PredictInput, ctx: TaskContext): Promise<PredictOutput> {
   const blob = decodeBinJson<SingleBlob | EnsembleBlob>(input.model);
   const target = blob.target;
-  const parts: { weight: number; art: ModelArtifact; prep: PreprocessorState }[] = 'kind' in blob
-    ? blob.members.flatMap((m) => m.folds.map((f) => ({ weight: m.weight / m.folds.length, art: f.artifact, prep: f.preprocessor })))
-    : [{ weight: 1, art: blob.artifact, prep: blob.preprocessor }];
+  const parts: { weight: number; art: ModelArtifact; prep: PreprocessorState; target: TargetState }[] = 'kind' in blob
+    ? blob.members.flatMap((m) => m.folds.map((f) => ({
+      weight: m.weight / m.folds.length, art: f.artifact, prep: f.preprocessor,
+      target: f.target ?? blob.target, // legacy ensemble fallback (old archives did not store per-fold scaling)
+    })))
+    : [{ weight: 1, art: blob.artifact, prep: blob.preprocessor, target: blob.target }];
   const missing = [...new Set(parts.flatMap((p) => p.prep.steps.map((s) => s.column)))].filter((c) => !input.table.columns.some((x) => x.name === c));
   if (missing.length) throw new Error(`Missing columns: ${missing.join(', ')}`);
   let acc: Float64Array | null = null, cols = 1;
@@ -46,14 +49,20 @@ export async function predictTask(input: PredictInput, ctx: TaskContext): Promis
     const P = await scoreOne(parts[i].art, parts[i].prep, input, ctx);
     cols = P.cols;
     acc ??= new Float64Array(P.data.length);
-    for (let j = 0; j < P.data.length; j++) acc[j] += parts[i].weight * P.data[j];
+    if (target.task === 'regression') {
+      const scale = parts[i].target;
+      if (scale.task !== 'regression') throw new Error('Regression fold is missing its target scaling');
+      for (let j = 0; j < P.data.length; j++) acc[j] += parts[i].weight * (P.data[j] * scale.std + scale.mean);
+    } else {
+      for (let j = 0; j < P.data.length; j++) acc[j] += parts[i].weight * P.data[j];
+    }
     ctx.progress({ fraction: (i + 1) / parts.length });
     await ctx.checkpoint();
   }
   const n = input.table.rowCount;
   const ids = input.idColumn ? Array.from({ length: n }, (_, i) => cellString(getColumn(input.table, input.idColumn!), i)) : undefined;
   if (target.task === 'regression') {
-    return { task: 'regression', prediction: Array.from(acc!, (v) => v * target.std + target.mean), ids };
+    return { task: 'regression', prediction: Array.from(acc!), ids };
   }
   const labels: string[] = [], proba: number[][] = [];
   for (let i = 0; i < n; i++) {
