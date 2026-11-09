@@ -1,7 +1,7 @@
 import { cellString, getColumn, type ColumnarTable } from '../../data/table';
 import { takeVector, type Matrix } from '../../ml/matrix';
 import { classificationMetrics, regressionMetrics, rocCurve, type MetricSet } from '../../ml/metrics';
-import { encodeTarget, fitPreprocessor, fitTarget, inferTask, labelledRows, transform, type PreprocessorState, type TargetState, type TaskKind } from '../../ml/preprocess';
+import { encodeTarget, fitPreprocessor, fitTarget, inferTask, labelledRows, transform, transformTraining, type PreprocessorState, type TargetState, type TaskKind } from '../../ml/preprocess';
 import { groupKFold, groupSplit, holdoutSplit, kFold, timeSplit, type Fold, type SplitConfig, type SplitIndices } from '../../ml/split';
 import { validateParams } from '../../models/params';
 import { getPlugin } from '../../models/registry';
@@ -60,7 +60,8 @@ export async function fitOnce(
   const nClasses = target.task === 'regression' ? 0 : target.classes.length;
   const prep = fitPreprocessor(table, features, trainRows, config.preprocess, { y: yRaw, nClasses });
   if (!prep.outputNames.length) throw new Error('No usable features after preprocessing');
-  const Xtr = transform(prep, table, trainRows), Xva = transform(prep, table, validRows);
+  const Xtr = transformTraining(prep, table, trainRows, { y: yRaw, nClasses }, rng.fork('target-encoding'));
+  const Xva = transform(prep, table, validRows);
   const enc = (rows: Int32Array) => {
     const y = takeVector(yRaw, rows);
     if (target.task === 'regression') for (let i = 0; i < y.length; i++) y[i] = (y[i] - target.mean) / target.std;

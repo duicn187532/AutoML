@@ -160,9 +160,9 @@ export function amlPredict(bundle, row) {
   for (var i = 0; i < bundle.members.length; i++) {
     var mem = bundle.members[i], x = amlTransform(mem.prep, row), r = amlEvalModel(mem.model, x, nC);
     if (nC) { if (!acc) acc = r.map(function () { return 0; }); for (var c = 0; c < nC; c++) acc[c] += mem.weight * r[c]; }
-    else acc = (acc || 0) + mem.weight * r;
+    else { var scale = mem.targetScale || t; acc = (acc || 0) + mem.weight * (r * scale.std + scale.mean); }
   }
-  if (!nC) return { value: acc * t.std + t.mean };
+  if (!nC) return { value: acc };
   var best = 0; for (var k = 1; k < nC; k++) if (acc[k] > acc[best]) best = k;
   return { label: t.classes[best], proba: acc };
 }

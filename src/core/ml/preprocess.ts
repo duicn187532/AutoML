@@ -1,6 +1,8 @@
 import { cellString, getColumn, type Column, type ColumnarTable } from '../data/table';
 import type { Matrix } from './matrix';
 import { hashString } from '../rng';
+import type { Rng } from '../rng';
+import { kFold } from './split';
 
 /**
  * Tabular preprocessing. Statistics are fitted on TRAINING ROWS ONLY and stored as plain JSON,
@@ -270,6 +272,49 @@ export function transform(state: PreprocessorState, table: ColumnarTable, rowIdx
     }
   }
   return { rows: n, cols, data };
+}
+
+/**
+ * Cross-fitted target encoding for TRAINING rows. A row's target is never used
+ * to encode that row: each inner fold is transformed with a lookup fitted on
+ * its complementary rows. The full-training lookup in `state` remains the
+ * one used for validation, test, saved predictions and portable exports.
+ */
+export function transformTraining(
+  state: PreprocessorState,
+  table: ColumnarTable,
+  trainIdx: ArrayLike<number>,
+  target: { y: Float64Array; nClasses: number },
+  rng: Rng,
+): Matrix {
+  const X = transform(state, table, trainIdx);
+  if (!state.steps.some((s) => s.type === 'target')) return X;
+  if (trainIdx.length < 2) throw new Error('Cross-fitted target encoding requires at least 2 training rows');
+  const stratify = target.nClasses > 0 ? Array.from({ length: trainIdx.length }, (_, i) => target.y[trainIdx[i]]) : undefined;
+  const folds = kFold(trainIdx.length, Math.min(5, trainIdx.length), rng, stratify);
+  let offset = 0;
+  for (const step of state.steps) {
+    if (step.type === 'target') {
+      const col = getColumn(table, step.column);
+      for (const fold of folds) {
+        const fitRows = Int32Array.from(fold.train, (i) => trainIdx[i]);
+        const encoded = fitTargetEncoding(col, step.column, fitRows, target);
+        for (const localRow of fold.valid) {
+          const key = cellString(col, trainIdx[localRow]) ?? MISSING_TOKEN;
+          const values = encoded.table[key] ?? encoded.prior;
+          for (let j = 0; j < step.outputs; j++) X.data[localRow * X.cols + offset + j] = values[j];
+        }
+      }
+    }
+    offset += step.type === 'numeric' ? (step.indicator ? 2 : 1)
+      : step.type === 'onehot' ? step.categories.length + (step.other ? 1 : 0)
+      : step.type === 'hash' ? step.buckets
+      : step.type === 'target' ? step.outputs
+      : step.type === 'tfidf' ? step.vocab.length
+      : step.type === 'datetime' ? step.parts.length
+      : 1;
+  }
+  return X;
 }
 
 /* ---------- target ---------- */
