@@ -17,6 +17,7 @@ export const zhTW = {
   'project.export': '匯出專案 .zip',
   'project.import': '匯入專案 .zip',
   'project.saved': '已自動儲存至瀏覽器',
+  'project.saveError': '⚠ 儲存失敗（瀏覽器空間可能不足）—請匯出專案 .zip 備份',
   'project.saving': '儲存中…',
   'project.importFailed': '匯入失敗：{error}',
   'project.confirmNew': '建立新專案？目前專案仍保留在瀏覽器中，可先匯出 .zip 備份。',
