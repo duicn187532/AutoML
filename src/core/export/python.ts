@@ -8,8 +8,13 @@ import type { ExperimentRecord } from '../project/types';
  * experiment's preprocessing, split and model. `mode: 'workbench'` loads data with aml.load()
  * (Script mode); 'standalone' reads a CSV file.
  */
+/** Gaussian-process kernels are passed from the model definitions as `{ $kernel: 'rbf_white' }`. */
+export const GP_KERNELS: Record<string, { code: string; imports: string }> = {
+  rbf_white: { code: 'ConstantKernel(1.0) * RBF(length_scale=1.0) + WhiteKernel(noise_level=0.1)', imports: 'from sklearn.gaussian_process.kernels import ConstantKernel, RBF, WhiteKernel' },
+};
 const py = (v: unknown): string => {
   if (v === null || v === undefined) return 'None';
+  if (typeof v === 'object' && v && '$kernel' in v) return GP_KERNELS[String((v as { $kernel: string }).$kernel)].code;
   if (typeof v === 'boolean') return v ? 'True' : 'False';
   if (typeof v === 'number') return Number.isFinite(v) ? String(v) : 'None';
   if (typeof v === 'string') return JSON.stringify(v);
@@ -18,14 +23,15 @@ const py = (v: unknown): string => {
 };
 const kwargs = (o: Record<string, unknown>) => Object.entries(o).map(([k, v]) => `${k}=${py(v)}`).join(', ');
 
-function estimator(pluginId: string, p: ParamValues, task: string, seed: number): { imports: string[]; code: string; note?: string } {
+export function estimatorCode(pluginId: string, p: ParamValues, task: string, seed: number): { imports: string[]; code: string; note?: string } {
   const cls = task !== 'regression';
   const def = SKLEARN_DEFS.find((d) => d.id === pluginId);
   if (def) {
     const path = cls ? def.estimator.cls! : def.estimator.reg!;
     const mod = path.slice(0, path.lastIndexOf('.')), name = path.slice(path.lastIndexOf('.') + 1);
     const kw = def.kwargs(p, { task: task as never, seed, nClasses: 0 });
-    return { imports: [`from ${mod} import ${name}`], code: `${name}(${kwargs(kw)})` };
+    const kernel = Object.values(kw).find((v): v is { $kernel: string } => typeof v === 'object' && v !== null && '$kernel' in v);
+    return { imports: [`from ${mod} import ${name}`, ...(kernel ? [GP_KERNELS[kernel.$kernel].imports] : [])], code: `${name}(${kwargs(kw)})` };
   }
   if (pluginId === 'logistic') return { imports: ['from sklearn.linear_model import LogisticRegression'], code: `LogisticRegression(C=${py(1 / Math.max(1e-12, num(p, 'l2')) / 1000)}, max_iter=2000)`, note: 'Workbench uses Adam + L2 with early stopping; sklearn uses L-BFGS — scores will be close, not identical.' };
   if (pluginId === 'ridge') return { imports: ['from sklearn.linear_model import Ridge'], code: `Ridge(alpha=${py(num(p, 'alpha'))})` };
@@ -47,7 +53,7 @@ export function experimentToPython(exp: ExperimentRecord, dataset: { name: strin
   const numeric = features.filter((f) => kinds.get(f) === 'numeric');
   const categorical = features.filter((f) => kinds.get(f) === 'categorical');
   const dates = features.filter((f) => kinds.get(f) === 'datetime');
-  const est = estimator(c.pluginId, c.params, task, c.seed);
+  const est = estimatorCode(c.pluginId, c.params, task, c.seed);
   const split = c.split ?? { kind: 'holdout', validFraction: c.validFraction, testFraction: 0 };
   const enc = c.preprocess.categoricalEncoding ?? 'onehot';
   const catEncoder = enc === 'ordinal' ? 'OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)'

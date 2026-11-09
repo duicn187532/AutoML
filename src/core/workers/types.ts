@@ -256,9 +256,13 @@ export interface ForecastInput {
   params: Record<string, number | string>;
   horizon: number;
   holdout: number;
+  /** How to combine several rows with the same timestamp (e.g. many transactions per day). Default: sum. */
+  aggregate?: 'sum' | 'mean';
 }
 export interface ForecastOutput {
   frequency: string;
+  /** Rows merged because they shared a timestamp (0 = none). */
+  merged?: number;
   season: number;
   history: { t: string[]; y: number[] };
   holdout?: { pred: number[]; lo: number[]; hi: number[]; mae: number; rmse: number; mape: number };

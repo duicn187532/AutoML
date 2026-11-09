@@ -25,9 +25,20 @@ def _register(model):
     return _next_id[0]
 
 
+def _kernel(name):
+    from sklearn.gaussian_process.kernels import RBF, ConstantKernel, WhiteKernel
+    if name == "rbf_white":
+        return ConstantKernel(1.0) * RBF(length_scale=1.0) + WhiteKernel(noise_level=0.1)
+    raise ValueError(f"unknown kernel {name}")
+
+
 def make(path, kwargs_json):
     mod, cls = path.rsplit(".", 1)
-    est = getattr(importlib.import_module(mod), cls)(**json.loads(kwargs_json))
+    kwargs = json.loads(kwargs_json)
+    for k, v in list(kwargs.items()):
+        if isinstance(v, dict) and "$kernel" in v:
+            kwargs[k] = _kernel(v["$kernel"])
+    est = getattr(importlib.import_module(mod), cls)(**kwargs)
     return _register(est)
 
 

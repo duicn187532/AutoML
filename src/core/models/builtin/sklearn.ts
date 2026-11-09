@@ -68,9 +68,13 @@ class SkModel implements TrainedModel {
     };
     const v = data.valid;
     const empty = new Float64Array(0);
-    const out = JSON.parse(
-      bridge.fit(this.id, this.def.fitKind ?? 'plain', data.X.data, data.X.rows, data.X.cols, data.y, v?.X.data ?? empty, v?.X.rows ?? 0, v?.y ?? empty, onPoint, JSON.stringify(this.def.fitKwargs?.(p) ?? {})),
-    ) as { bestEpoch?: number; notes: string[] };
+    let raw: string;
+    try {
+      raw = bridge.fit(this.id, this.def.fitKind ?? 'plain', data.X.data, data.X.rows, data.X.cols, data.y, v?.X.data ?? empty, v?.X.rows ?? 0, v?.y ?? empty, onPoint, JSON.stringify(this.def.fitKwargs?.(p) ?? {}));
+    } catch (e) {
+      throw new Error(pythonFitError(e, this.def.name.en, data.X.rows, data.X.cols));
+    }
+    const out = JSON.parse(raw) as { bestEpoch?: number; notes: string[] };
     await ctx.checkpoint();
     ctx.progress({ fraction: 1 });
     return { history: history.epoch.length ? history : {}, bestEpoch: out.bestEpoch, epochs: history.epoch.length || undefined, notes: out.notes };
@@ -144,6 +148,17 @@ const P = {
   earlyStop: (d = 30) => int('earlyStopping', L('Early stopping 輪數（0 = 關）', 'Early-stopping rounds (0 = off)'), d, 0, 1000, [20, 100], L('驗證分數連續這麼多輪沒進步就停止，並使用最佳輪。', 'Stop when validation has not improved for this many rounds; keep the best iteration.')),
 };
 const mf = (p: ParamValues) => { const v = str(p, 'maxFeatures'); return v === 'sqrt' || v === 'log2' ? v : Number(v); };
+
+/** Turn a Python traceback into one readable line; out-of-memory gets an actionable hint. */
+export function pythonFitError(e: unknown, model: string, rows: number, cols: number): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  const last = msg.trim().split('\n').map((l) => l.trim()).filter(Boolean).pop() ?? msg;
+  if (/MemoryError|Unable to allocate|out of memory|Cannot allocate|array is too big|maximum possible size/i.test(msg)) {
+    return `${model}: not enough browser memory for ${rows.toLocaleString('en-US')} rows × ${cols} features (${last}). `
+      + 'Sample fewer rows (Data Prep → Clean → Random sample) or choose a lighter model such as HistGBDT. / 記憶體不足：請先抽樣減少列數，或改用較輕量的模型。';
+  }
+  return `${model}: ${last}`;
+}
 
 export const SKLEARN_DEFS: SkDef[] = [
   {
@@ -264,7 +279,8 @@ export const SKLEARN_DEFS: SkDef[] = [
     estimator: { cls: 'sklearn.gaussian_process.GaussianProcessClassifier', reg: 'sklearn.gaussian_process.GaussianProcessRegressor' },
     params: [int('restarts', L('核參數最佳化重啟次數', 'Optimizer restarts'), 0, 0, 10, [0, 3])],
     kwargs: (p, c) => (c.task === 'regression'
-      ? { n_restarts_optimizer: num(p, 'restarts'), normalize_y: true, random_state: c.seed }
+      // WhiteKernel lets the GP learn the noise level; without it the default RBF interpolates every training point (train RMSE 0, poor validation).
+      ? { kernel: { $kernel: 'rbf_white' }, n_restarts_optimizer: num(p, 'restarts'), normalize_y: true, random_state: c.seed }
       : { n_restarts_optimizer: num(p, 'restarts'), random_state: c.seed }),
   },
 ];

@@ -1,3 +1,4 @@
+import { modelAdvice } from '@/core/models/advice';
 import { useEffect, useMemo, useState } from 'react';
 import { copyExperimentToScript, downloadPython, searchParams, startTraining, trainAll, type SearchMethod } from '@/app/actions';
 import type { SearchDim } from '@/core/auto/search';
@@ -280,6 +281,9 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
               {plugins.map((p) => <option key={p.id} value={p.id}>{t.text(p.name)}{p.engines.length ? ` · ${p.engines.includes('pyodide') ? 'Python' : p.engines.join(', ')}` : ''}</option>)}
             </select>
             <div className="hint">{t.text(plugin.description)}</div>
+            {modelAdvice(pluginId, inferred, dataset.rowCount, dataset.columns.filter((c) => features.includes(c.name) && c.name !== target), params).map((a, i) => (
+              <div key={i} className={`advice ${a.level}`} data-testid="model-advice">{a.level === 'warn' ? '⚠ ' : 'ℹ '}{t.text(a.text)}</div>
+            ))}
           </div>
           <div className="field">
             <label htmlFor="split">{t('lib.split')}</label>

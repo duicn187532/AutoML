@@ -34,6 +34,20 @@ export function detectFrequency(ms: number[]): { stepMs: number; label: string; 
   return { stepMs: med, label: best[1], seasonGuess: season };
 }
 
+/** Merge rows (sorted by t) that share a timestamp; returns how many rows were merged away. */
+export function collapseTimestamps(rows: { t: number; y: number }[], agg: 'sum' | 'mean'): number {
+  const n0 = rows.length;
+  let w = -1, cnt = 0;
+  for (let i = 0; i < n0; i++) {
+    if (w >= 0 && rows[i].t === rows[w].t) { rows[w].y += rows[i].y; cnt++; continue; }
+    if (w >= 0 && agg === 'mean' && cnt > 1) rows[w].y /= cnt;
+    rows[++w] = rows[i]; cnt = 1;
+  }
+  if (w >= 0 && agg === 'mean' && cnt > 1) rows[w].y /= cnt;
+  rows.length = w + 1;
+  return n0 - rows.length;
+}
+
 /** ARIMA / ETS forecasting of one series ordered by a time column (statsmodels in Pyodide). */
 export async function forecastTask(input: ForecastInput, ctx: TaskContext): Promise<ForecastOutput> {
   const t0 = performance.now();
@@ -45,8 +59,11 @@ export async function forecastTask(input: ForecastInput, ctx: TaskContext): Prom
     const t = tc.kind === 'numeric' ? tc.values[i] : s === null ? NaN : Date.parse(s.replace(/\//g, '-'));
     if (!Number.isNaN(t) && !Number.isNaN(y)) rows.push({ t, label: s ?? String(t), y });
   }
-  if (rows.length < 12) throw new Error('Need at least 12 observations');
   rows.sort((a, b) => a.t - b.t);
+  // Several rows per timestamp (panel / transaction data) must become one observation per instant;
+  // otherwise they would be read as consecutive time steps.
+  const merged = collapseTimestamps(rows, input.aggregate ?? 'sum');
+  if (rows.length < 12) throw new Error('Need at least 12 distinct time points');
   const freq = tc.kind === 'numeric' ? { stepMs: 1, label: 'index', seasonGuess: 0 } : detectFrequency(rows.map((r) => r.t));
   const params: Record<string, number | string> = { ...input.params, season: input.params.season ?? freq.seasonGuess };
   const y = Float64Array.from(rows, (r) => r.y);
@@ -59,6 +76,7 @@ export async function forecastTask(input: ForecastInput, ctx: TaskContext): Prom
   return {
     ...res,
     frequency: freq.label,
+    merged,
     season: Number(params.season),
     history: { t: rows.map((r) => fmt(r.t)), y: Array.from(y) },
     futureT: Array.from({ length: input.horizon }, (_, i) => fmt(last + (i + 1) * freq.stepMs)),

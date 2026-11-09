@@ -18,16 +18,19 @@ export interface PortfolioEntry {
 export function portfolio(preset: Preset, task: TaskKind, rows: number): PortfolioEntry[] {
   const cls = task !== 'regression';
   const big = rows > 50_000;
+  // fully grown regression forests store ~one leaf per training row: keep bagged ensembles storable
+  const leaf = !cls && rows > 10_000 ? 5 : 1;
+  const forestTrees = big ? 100 : rows > 10_000 ? 150 : 300;
   const base: PortfolioEntry[] = [
     { pluginId: 'hist_gbdt', params: { maxIter: 300, learningRate: 0.08, maxLeafNodes: 31, earlyStopping: 20 }, label: 'HistGBDT' },
     { pluginId: cls ? 'logistic' : 'ridge', params: cls ? { epochs: 200, learningRate: 0.05, l2: 1e-4, patience: 10 } : { alpha: 1 }, label: cls ? 'Logistic' : 'Ridge' },
-    { pluginId: 'random_forest', params: { nEstimators: big ? 100 : 300, maxFeatures: cls ? 'sqrt' : '1.0', minSamplesLeaf: 1, maxDepth: 0 }, label: 'RandomForest' },
+    { pluginId: 'random_forest', params: { nEstimators: forestTrees, maxFeatures: cls ? 'sqrt' : '1.0', minSamplesLeaf: leaf, maxDepth: 0 }, label: 'RandomForest' },
   ];
   if (preset === 'fast') return base;
   const balanced: PortfolioEntry[] = [
     ...base,
     { pluginId: 'xgboost', params: { nEstimators: 1000, maxDepth: 6, learningRate: 0.05, subsample: 0.8, colsample: 0.8, lambda: 1, earlyStopping: 50 }, label: 'XGBoost' },
-    { pluginId: 'extra_trees', params: { nEstimators: big ? 100 : 300, maxFeatures: cls ? 'sqrt' : '1.0', minSamplesLeaf: 1, maxDepth: 0 }, label: 'ExtraTrees' },
+    { pluginId: 'extra_trees', params: { nEstimators: forestTrees, maxFeatures: cls ? 'sqrt' : '1.0', minSamplesLeaf: leaf, maxDepth: 0 }, label: 'ExtraTrees' },
     { pluginId: 'mlp', params: { hiddenLayers: 2, units: 128, dropout: 0.1, learningRate: 0.003, epochs: 200, batchSize: 128, patience: 15, activation: 'relu', l2: 0, backend: 'cpu' }, label: 'MLP' },
   ];
   if (preset === 'balanced') return balanced;

@@ -293,3 +293,6 @@ textarea.code:focus { outline: none; box-shadow: inset 2px 0 0 var(--accent); }
 .tpl-ref { background: var(--bg); border-left: 3px solid var(--accent); border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; line-height: 1.5; }
 .tpl-ref ul { margin: 4px 0 0; padding-left: 18px; }
 .tpl-ref a { word-break: break-word; }
+.advice { font-size: 12px; line-height: 1.5; padding: 6px 8px; border-radius: 6px; margin-top: 6px; background: var(--bg); }
+.advice.warn { border-left: 3px solid var(--warn); }
+.advice.info { border-left: 3px solid var(--accent); }

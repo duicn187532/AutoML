@@ -194,7 +194,18 @@ export const useProject = create<ProjectState>((set, get) => {
 
     async recordExperiment(exp, model) {
       const p = get().project!;
-      if (model) await storage.putBlob(p.id, model.record.blobKey, model.bytes);
+      if (model) {
+        try {
+          await storage.putBlob(p.id, model.record.blobKey, model.bytes);
+        } catch (e) {
+          // Keep the experiment (metrics, charts) even when the model itself cannot be stored,
+          // e.g. a several-hundred-MB random forest exceeding the browser's storage quota.
+          const mb = (model.bytes.byteLength / 1e6).toFixed(0);
+          const note = `Model not saved (${mb} MB, ${(e as Error).name || 'storage error'}): too large for browser storage — limit tree depth / leaf size or the number of trees, then train again. / 模型 ${mb} MB 無法存入瀏覽器，請限制樹深度或棵數後重新訓練。`;
+          exp = { ...exp, modelId: undefined, notes: [...(exp.notes ?? []), note] };
+          model = undefined;
+        }
+      }
       update((q) => ({
         ...q,
         experiments: [exp, ...q.experiments],

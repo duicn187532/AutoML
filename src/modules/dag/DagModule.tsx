@@ -52,7 +52,11 @@ function Inspector({ node, dataset, onChange }: { node: GNode; dataset?: Dataset
         let input;
         if (node.type === 'head' && k === 'target') input = <select value={String(v)} onChange={(e) => set(k, e.currentTarget.value)} data-testid="head-target"><option value="">—</option>{dataset?.columns.map((c) => <option key={c.name}>{c.name}</option>)}</select>;
         else if (node.type === 'gate' && k === 'ruleFeature') input = <select value={String(v)} onChange={(e) => set(k, e.currentTarget.value)}><option value="">—</option>{dataset?.columns.filter((c) => c.kind === 'numeric').map((c) => <option key={c.name}>{c.name}</option>)}</select>;
-        else if (enums) input = <select value={String(v)} onChange={(e) => set(k, e.currentTarget.value)}>{enums.map((o) => <option key={o} value={o}>{o}</option>)}</select>;
+        else if (enums) input = <select value={String(v)} onChange={(e) => set(k, e.currentTarget.value)}>{enums.map((o) => {
+          // CNN / LSTM / Transformer blocks need image or sequence inputs; tabular graphs cannot use them yet.
+          const seqOnly = node.type === 'block' && k === 'kind' && (o === 'cnn' || o === 'lstm' || o === 'transformer');
+          return <option key={o} value={o} disabled={seqOnly && v !== o}>{o}{seqOnly ? ` — ${t('dag.seqOnly')}` : ''}</option>;
+        })}</select>;
         else if (typeof v === 'boolean') input = <input type="checkbox" checked={v} onChange={(e) => set(k, e.currentTarget.checked)} />;
         else if (typeof v === 'number') input = <input type="number" value={v} step="any" onChange={(e) => set(k, Number(e.currentTarget.value))} />;
         else input = <input value={String(v)} onChange={(e) => set(k, e.currentTarget.value)} />;
