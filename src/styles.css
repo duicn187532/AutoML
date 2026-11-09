@@ -242,6 +242,7 @@ textarea.code:focus { outline: none; box-shadow: inset 2px 0 0 var(--accent); }
   }
   .topbar { gap: 6px; padding: 0 8px; position: relative; }
   .brand-text, .save-state { display: none; }
+  .save-state.error { display: block; position: absolute; top: 100%; left: 0; right: 0; z-index: 20; padding: 4px 10px; background: var(--panel); border-bottom: 1px solid var(--danger); }
   .project-name { flex: 1; width: auto; min-width: 0; }
   .topbar > .spacer { display: none; }
   .menu-toggle { display: inline-flex; }

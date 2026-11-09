@@ -30,10 +30,28 @@ describe('P1: chronological splits', () => {
     expect(() => timeSplit([1, NaN, 3], { validFraction: 0.25 })).toThrow();
   });
 
-  it('blocks identical timestamp values on either chronological partition boundary', () => {
-    expect(() => timeSplit([1, 1, 2, 2], { validFraction: 0.25 })).toThrow(/identical timestamps/);
-    expect(() => timeSplit([1, 2, 3, 3], { validFraction: 0, testFraction: 0.25 })).toThrow(/identical timestamps/);
+  it('never lets identical timestamps straddle two partitions (boundaries snap to tie groups)', () => {
+    const days = Array.from({ length: 100 }, (_, i) => Math.floor(i / 5)); // 20 days × 5 rows
+    const sp = timeSplit(days, { validFraction: 0.18, testFraction: 0.13 });
+    const set = (ix: Int32Array) => new Set(Array.from(ix, (i) => days[i]));
+    const [tr, va, te] = [set(sp.train), set(sp.valid), set(sp.test)];
+    for (const d of va) { expect(tr.has(d)).toBe(false); expect(te.has(d)).toBe(false); }
+    for (const d of te) expect(tr.has(d)).toBe(false);
+    expect(sp.valid.length).toBeGreaterThan(0);
+    expect(sp.test.length).toBeGreaterThan(0);
+    expect(sp.train.length + sp.valid.length + sp.test.length).toBe(100);
+    expect(Math.max(...tr)).toBeLessThan(Math.min(...va));
+    expect(Math.max(...va)).toBeLessThan(Math.min(...te));
+    // not enough distinct instants left for the requested partitions
+    expect(() => timeSplit([1, 1, 2, 2], { validFraction: 0.25 })).toThrow(/distinct timestamps/);
+    expect(() => timeSplit([1, 2, 3, 3], { validFraction: 0, testFraction: 0.25 })).toThrow(/distinct timestamps/);
     expect(() => timeSplit([1, 2, 3], { validFraction: -0.1 })).toThrow();
+  });
+
+  it('parses every timestamp shape that type inference labels as a date', () => {
+    expect(parseTimeValue('2024-01-05T13:45:10.123456')).toBe(Date.UTC(2024, 0, 5, 13, 45, 10, 123));
+    expect(parseTimeValue('2024-01-05T13:45:10+0800')).toBe(Date.UTC(2024, 0, 5, 5, 45, 10));
+    expect(parseTimeValue('2024-01-05 9:05')).toBe(Date.UTC(2024, 0, 5, 9, 5));
   });
 
   it('uses parsed timestamp ordering in the actual trainTask path', async () => {

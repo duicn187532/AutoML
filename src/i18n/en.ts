@@ -18,6 +18,7 @@ export const en: Record<MessageKey, string> = {
   'project.export': 'Export project .zip',
   'project.import': 'Import project .zip',
   'project.saved': 'Auto-saved in this browser',
+  'project.saveError': '⚠ Save failed (browser storage may be full) — export a project .zip',
   'project.saving': 'Saving…',
   'project.importFailed': 'Import failed: {error}',
   'project.confirmNew': 'Create a new project? The current one stays in this browser; export a .zip first to back it up.',

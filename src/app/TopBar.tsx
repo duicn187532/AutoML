@@ -57,7 +57,7 @@ export function TopBar() {
         onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
       />
       <span className={`save-state ${saveState}`} title={t('app.offline')}>
-        {saveState === 'saving' ? t('project.saving') : t('project.saved')}
+        {saveState === 'saving' ? t('project.saving') : saveState === 'error' ? t('project.saveError') : t('project.saved')}
       </span>
       <div className="spacer" />
       <button className="icon-btn drawer-toggle" onClick={() => setDrawer(!drawer)} aria-expanded={drawer} aria-controls="side-panel" title={`${t('panel.data')} / ${t('panel.tasks')}`}>

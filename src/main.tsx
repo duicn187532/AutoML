@@ -13,6 +13,9 @@ document.documentElement.lang = useLocale.getState().locale === 'zh-TW' ? 'zh-Ha
 // Diagnostics hook for E2E tests (opt-in via URL hash, exposes nothing sensitive).
 if (location.hash.includes('aml-debug')) Object.assign(window, { __aml: { pool, engineLoader, actions } });
 
+// Ask the browser not to evict saved projects under storage pressure (silently ignored where unsupported).
+try { void navigator.storage?.persist?.().catch(() => undefined); } catch { /* file:// or old browser */ }
+
 const root = createRoot(document.getElementById('root')!);
 useProject
   .getState()
