@@ -163,6 +163,7 @@ try {
   if (nExp < 6) throw new Error(`expected ≥6 experiments after reload, got ${nExp}`);
 
   step('project .zip export → import');
+  await page.getByTestId('project-menu').click();
   const [zipDl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('export-zip').click()]);
   const zipPath = join(profile, 'project.zip');
   await zipDl.saveAs(zipPath);

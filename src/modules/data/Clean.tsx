@@ -137,7 +137,7 @@ export function Clean({ dataset, table }: { dataset: DatasetRecord; table: Colum
       const r = await pool.submit({ kind: 'applyPipeline', input: { table, steps } }, { label: `pipeline → ${dataset.name}` }).result;
       const failed = r.log.filter((l) => l.error);
       if (failed.length) throw new Error(failed.map((l) => `#${l.step + 1}: ${l.error}`).join('; '));
-      const d = await addDataset(r.table, { name: `${dataset.name} (clean)`, source: { type: 'derived' }, derivedFrom: { datasetId: dataset.id, pipelineId: pipeline.id } });
+      const d = await addDataset(r.table, { name: `${dataset.name} (clean)`, source: { type: 'derived' }, derivedFrom: { datasetId: dataset.id, pipelineId: pipeline.id }, target: dataset.target });
       upsertPipeline({ ...pipeline, outputDatasetId: d.id });
       useUi.getState().selectDataset(d.id);
     } catch (e) {

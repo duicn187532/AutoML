@@ -21,6 +21,9 @@ import { defaultParams } from '@/core/models/params';
 import { getPlugin, listPlugins } from '@/core/models/registry';
 import type { ParamValues } from '@/core/models/types';
 import type { DatasetRecord, ExperimentRecord } from '@/core/project/types';
+import { datasetTarget } from '@/core/project/target';
+import { MascotNote, NeedData, PageHeader } from '@/app/ui/Page';
+import { useLeakage } from '../data/hooks';
 import { getColumn, type ColumnarTable } from '@/core/data/table';
 import { useT, type MessageKey } from '@/i18n';
 
@@ -120,7 +123,7 @@ export function LibraryModule() {
   }, [dataset, getTable]);
 
   const [mode, setMode] = useState<'supervised' | 'unsupervised' | 'forecast'>('supervised');
-  if (!dataset) return <div className="module"><h1>{t('nav.library')}</h1><p className="muted">{t('panel.data.empty')}</p></div>;
+  if (!dataset) return <NeedData id="library" />;
   const tabs = (
     <div className="tabs lib-tabs" role="tablist">
       {(['supervised', 'unsupervised', 'forecast'] as const).map((k) => (
@@ -128,11 +131,11 @@ export function LibraryModule() {
       ))}
     </div>
   );
-  if (dataset.images) return <div className="module"><h1>{t('nav.library')} · {t('img.title')}</h1><ImageTrainer key={dataset.id} dataset={dataset} /></div>;
-  if (loaded?.id !== dataset.id) return <div className="module"><h1>{t('nav.library')}</h1>{tabs}</div>;
+  if (dataset.images) return <div className="module"><PageHeader id="library" title={`${t('nav.library')} · ${t('img.title')}`} /><ImageTrainer key={dataset.id} dataset={dataset} /></div>;
+  if (loaded?.id !== dataset.id) return <div className="module"><PageHeader id="library" />{tabs}</div>;
   return (
     <>
-      <div className="module-head">{tabs}</div>
+      <div className="module-head"><PageHeader id="library" />{tabs}</div>
       {mode === 'supervised' && <LibraryForm key={dataset.id} dataset={dataset} table={loaded.table} />}
       {mode === 'unsupervised' && <div className="module"><Unsupervised key={dataset.id} dataset={dataset} table={loaded.table} /></div>}
       {mode === 'forecast' && <div className="module"><Forecast key={dataset.id} dataset={dataset} table={loaded.table} /></div>}
@@ -148,11 +151,20 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
   const project = useProject((s) => s.project)!;
   const taskOf = (col: string) => inferTask(getColumn(table, col));
   const prefill = useUi((s) => (s.libraryPrefill?.datasetId === dataset.id ? s.libraryPrefill : null));
-  const initialTarget = prefill?.target ?? dataset.columns[dataset.columns.length - 1]?.name ?? '';
+  const initialTarget = prefill?.target ?? datasetTarget(dataset);
 
   const [target, setTarget] = useState(initialTarget);
   const [features, setFeatures] = useState<string[]>(() => defaultFeatures(dataset, initialTarget));
   const inferred: TaskKind = useMemo(() => inferTask(getColumn(table, target)), [table, target]);
+  // Untick columns the quality report flags as target leakage (once per target; the user can tick them again).
+  const leak = useLeakage(dataset.id, table, target);
+  const leakKey = leak.ready ? `${target}|${leak.columns.join(',')}` : '';
+  const [leakApplied, setLeakApplied] = useState('');
+  if (leakKey && leakKey !== leakApplied) {
+    // adjust state while rendering (React's documented alternative to a sync effect)
+    setLeakApplied(leakKey);
+    if (leak.columns.length) setFeatures((f) => f.filter((x) => !leak.columns.includes(x)));
+  }
   const [pluginId, setPluginId] = useState(() => prefill?.pluginId ?? listPlugins(taskOf(initialTarget))[0].id);
   const [params, setParams] = useState<ParamValues>(() => ({ ...defaultParams(getPlugin(pluginId), taskOf(initialTarget)), ...(prefill?.params ?? {}) }));
   useEffect(() => {
@@ -177,6 +189,7 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
 
   const changeTarget = (v: string) => {
     setTarget(v);
+    useProject.getState().setDatasetTarget(dataset.id, v);
     setFeatures((f) => f.filter((x) => x !== v));
     const task = taskOf(v);
     if (!getPlugin(pluginId).tasks.includes(task)) {
@@ -244,9 +257,9 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
 
   return (
     <div className="module">
-      <h1>{t('nav.library')}</h1>
       <div className="two-col">
-        <div className="card form">
+        <div className="card form lib-form">
+          <div className="form-section">{t('lib.sectionData')}</div>
           <div className="field">
             <label>{t('exp.dataset')}</label>
             <select value={dataset.id} onChange={(e) => useUi.getState().selectDataset(e.currentTarget.value)}>
@@ -258,7 +271,7 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
             <select id="target" data-testid="target" value={target} onChange={(e) => changeTarget(e.currentTarget.value)}>
               {dataset.columns.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
-            {<div className="hint">{t('lib.taskKind')}: <strong>{t(`task.kind.${inferred}` as MessageKey)}</strong></div>}
+            <div className="chips"><span className="chip accent">{t(`task.kind.${inferred}` as MessageKey)}</span></div>
           </div>
           <details className="field">
             <summary>{t('lib.features')} ({features.filter((f) => f !== target).length}/{dataset.columns.length - 1})</summary>
@@ -275,6 +288,10 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
               ))}
             </div>
           </details>
+          {leak.columns.length > 0 && leak.columns.every((c) => !features.includes(c)) && (
+            <MascotNote who="hachiman" testId="leak-note" title={t('auto.leakTitle', { cols: leak.columns.join(', ') })}>{t('auto.leakWhy')}</MascotNote>
+          )}
+          <div className="form-section">{t('lib.sectionModel')}</div>
           <div className="field">
             <label htmlFor="model">{t('lib.model')}</label>
             <select id="model" data-testid="model" value={pluginId} onChange={(e) => { const p = getPlugin(e.currentTarget.value); setPluginId(p.id); setParams(defaultParams(p, inferred)); }}>
@@ -285,6 +302,14 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
               <div key={i} className={`advice ${a.level}`} data-testid="model-advice">{a.level === 'warn' ? '⚠ ' : 'ℹ '}{t.text(a.text)}</div>
             ))}
           </div>
+          <div className="row params-head">
+            <h3>{t('lib.params')}</h3>
+            <div className="spacer" />
+            <button className="link" onClick={() => setParams(defaultParams(plugin, inferred))}>{t('lib.reset')}</button>
+          </div>
+          <ParamForm specs={plugin.params} values={params} onChange={setParams} />
+          <details className="advanced">
+            <summary>{t('lib.advanced')} <span className="muted small">· {t(`split.${splitKind}` as MessageKey)}</span></summary>
           <div className="field">
             <label htmlFor="split">{t('lib.split')}</label>
             <select id="split" value={splitKind} onChange={(e) => setSplitKind(e.currentTarget.value as SplitKind)} data-testid="split">
@@ -328,13 +353,8 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
               <input id="seed" type="number" min={0} value={seed} onChange={(e) => setSeed(Number(e.currentTarget.value) >>> 0)} />
             </div>
           </div>
-          <div className="row">
-            <h3>{t('lib.params')}</h3>
-            <div className="spacer" />
-            <button className="link" onClick={() => setParams(defaultParams(plugin, inferred))}>{t('lib.reset')}</button>
-          </div>
-          <ParamForm specs={plugin.params} values={params} onChange={setParams} />
-          <div className="row">
+          </details>
+          <div className="form-actions sticky">
             <button className="primary big" onClick={train} disabled={running} data-testid="train">
               {running ? t('lib.training') : t('lib.train')}
             </button>
@@ -371,7 +391,7 @@ function LibraryForm({ dataset, table }: { dataset: DatasetRecord; table: Column
         <div className="stack">
           <div className="card">
             <h3>{t('lib.curve')}</h3>
-            <LiveCurve series={[{ label: plugin.id, points: points ?? [] }]} />
+            {taskId ? <LiveCurve series={[{ label: plugin.id, points: points ?? [] }]} /> : <div className="chart-empty">{t('lib.curveEmpty')}</div>}
             {task?.engineLoading && <p className="small muted">{t('task.loadingEngine', { name: task.engineLoading.name, pct: Math.round(task.engineLoading.fraction * 100) })}</p>}
           </div>
           {batchId && <Leaderboard batchId={batchId} onSelect={(e) => setExpId(e.id)} />}

@@ -6,6 +6,7 @@ import { useProject } from '@/app/stores/project';
 import type { ExperimentRecord } from '@/core/project/types';
 import { safeFileName } from '@/core/security/escape';
 import { useT, type MessageKey } from '@/i18n';
+import { CHART } from '@/charts/palette';
 
 /** Batch prediction with an experiment's stored model on any dataset with the same columns. */
 export function PredictPanel({ exp }: { exp: ExperimentRecord }) {
@@ -85,7 +86,7 @@ export function PredictPanel({ exp }: { exp: ExperimentRecord }) {
             grid: { left: 150, right: 30, top: 10, bottom: 30 }, tooltip: { trigger: 'axis' },
             xAxis: { type: 'value' },
             yAxis: { type: 'category', inverse: true, data: explanation.items.slice(0, 15).map((i) => `${i.feature} = ${i.value ?? 'NA'}`), axisLabel: { width: 140, overflow: 'truncate' } },
-            series: [{ type: 'bar', data: explanation.items.slice(0, 15).map((i) => ({ value: +i.contribution.toPrecision(4), itemStyle: { color: i.contribution >= 0 ? '#16a34a' : '#dc2626' } })) }],
+            series: [{ type: 'bar', data: explanation.items.slice(0, 15).map((i) => ({ value: +i.contribution.toPrecision(4), itemStyle: { color: i.contribution >= 0 ? CHART.positive : CHART.negative } })) }],
           }} height={Math.min(15, explanation.items.length) * 22 + 50} />
         </div>
       )}

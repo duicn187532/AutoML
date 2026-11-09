@@ -4,6 +4,7 @@ import { GridComponent, LegendComponent, ParallelComponent, TooltipComponent, Vi
 import * as echarts from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { escapeHtml } from '@/core/security/escape';
+import { CHART } from './palette';
 
 /**
  * Analysis charts (confusion matrix, ROC, distributions, parallel coordinates later).
@@ -48,7 +49,7 @@ export function confusionOption(cm: number[][], labels: string[], axisNames: { t
     grid: { left: 90, right: 20, top: 10, bottom: 60 },
     xAxis: { type: 'category', data: labels, axisLabel: { interval: 0, rotate: labels.length > 6 ? 30 : 0 }, name: axisNames.pred, nameLocation: 'middle', nameGap: 35, splitArea: { show: true } },
     yAxis: { type: 'category', data: labels, name: axisNames.truth, inverse: true, splitArea: { show: true } },
-    visualMap: { min: 0, max: max || 1, show: false, inRange: { color: ['#eef2ff', '#1d4ed8'] } },
+    visualMap: { min: 0, max: max || 1, show: false, inRange: { color: [...CHART.sequential] } },
     series: [{ type: 'heatmap', data, label: { show: true }, emphasis: { itemStyle: { borderColor: '#111', borderWidth: 1 } } }],
   };
 }
@@ -74,7 +75,7 @@ export function importanceOption(names: string[], values: number[]): EChartsOpti
     grid: { left: 150, right: 20, top: 10, bottom: 30 },
     xAxis: { type: 'value' },
     yAxis: { type: 'category', data: top.map((x) => x[0]), axisLabel: { interval: 0, width: 140, overflow: 'truncate' } },
-    series: [{ type: 'bar', data: top.map((x) => +x[1].toPrecision(4)), itemStyle: { color: '#1d4ed8' } }],
+    series: [{ type: 'bar', data: top.map((x) => +x[1].toPrecision(4)), itemStyle: { color: CHART.primary } }],
   };
 }
 
@@ -87,7 +88,7 @@ export function scatterOption(y: number[], pred: number[]): EChartsOption {
     xAxis: { type: 'value', name: 'actual', nameLocation: 'middle', nameGap: 28, min: lo, max: hi, scale: true },
     yAxis: { type: 'value', name: 'predicted', min: lo, max: hi, scale: true },
     series: [
-      { type: 'scatter', symbolSize: 4, data: y.map((v, i) => [v, pred[i]]), itemStyle: { color: '#2563eb', opacity: 0.6 } },
+      { type: 'scatter', symbolSize: 4, data: y.map((v, i) => [v, pred[i]]), itemStyle: { color: CHART.primary, opacity: 0.6 } },
       { type: 'line', showSymbol: false, data: [[lo, lo], [hi, hi]], lineStyle: { type: 'dashed', opacity: 0.5 } },
     ],
   };
@@ -104,7 +105,7 @@ export function permutationOption(items: { feature: string; mean: number; ci95: 
     series: [{
       type: 'bar',
       data: top.map((x) => ({ value: +x.mean.toPrecision(4), label: { show: true, position: 'right', formatter: `±${x.ci95.toPrecision(2)}`, fontSize: 10 } })),
-      itemStyle: { color: '#1d4ed8' },
+      itemStyle: { color: CHART.primary },
     }],
   };
 }
@@ -119,7 +120,7 @@ export function parallelOption(rows: Record<string, number | string>[], dims: st
       ...(isCat(d) ? { type: 'category', data: [...new Set(rows.map((r) => String(r[d])))] } : {}),
     })),
     parallel: { left: 60, right: 80, top: 40, bottom: 30 },
-    visualMap: { dimension: dims.length, min: Math.min(...values), max: Math.max(...values), inRange: { color: higherIsBetter ? ['#cbd5e1', '#1d4ed8'] : ['#1d4ed8', '#cbd5e1'] }, right: 0, top: 'center', calculable: true },
+    visualMap: { dimension: dims.length, min: Math.min(...values), max: Math.max(...values), inRange: { color: higherIsBetter ? ['#EADBC8', CHART.ink] : [CHART.ink, '#EADBC8'] }, right: 0, top: 'center', calculable: true },
     series: [{ type: 'parallel', lineStyle: { width: 2, opacity: 0.7 }, data: rows.map((r) => [...dims, metric].map((d) => r[d])) }],
   };
 }

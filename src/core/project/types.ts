@@ -52,6 +52,8 @@ export interface DatasetRecord {
   createdAt: number;
   warnings?: string[];
   derivedFrom?: { datasetId: string; pipelineId: string };
+  /** Column the user wants to predict (shared by every module; see datasetTarget()). */
+  target?: string;
   /** Image dataset: table has columns `file` and `label`; JPEG bytes live in this blob (binary-JSON ImagePack). */
   images?: { blobKey: string; count: number };
 }

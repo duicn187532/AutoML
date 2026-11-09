@@ -3,6 +3,7 @@ import type { DataProfile, QualityIssue } from '@/core/data/explore';
 import type { ColumnKind, ColumnProfile } from '@/core/data/table';
 import type { DatasetRecord } from '@/core/project/types';
 import { useT, type MessageKey } from '@/i18n';
+import { BRAND } from '@/app/brand';
 
 const KINDS: ColumnKind[] = ['numeric', 'categorical', 'text', 'datetime', 'id'];
 
@@ -23,16 +24,20 @@ export function QualityReport({ profile }: { profile: DataProfile }) {
   for (const q of profile.quality) counts[q.status]++;
   return (
     <div className="card" data-testid="quality-report">
-      <div className="row">
-        <h3>{t('quality.title')}</h3>
-        <span className="badge failed">{t('quality.warn')} {counts.warn}</span>
-        <span className="badge running">{t('quality.auto')} {counts.auto}</span>
-        {profile.quality.length === 0 && <span className="badge done">{t('quality.pass')}</span>}
+      <div className="row quality-head">
+        <img className="quality-orei" src={BRAND.orei} alt="" />
+        <div className="quality-title">
+          <h3>{t('quality.title')}</h3>
+          <span className="small muted">{t('quality.byOrei')}</span>
+        </div>
+        <span className="badge warn-tag">{t('quality.warn')} {counts.warn}</span>
+        <span className="badge ok-tag">{t('quality.auto')} {counts.auto}</span>
+        {profile.quality.length === 0 && <span className="badge ok-tag">{t('quality.pass')}</span>}
       </div>
       <ul className="issues">
         {profile.quality.map((q, i) => (
           <li key={i} className={`issue ${q.status}`}>
-            <span className={`badge ${q.status === 'warn' ? 'failed' : 'running'}`}>{t(`quality.${q.status}` as MessageKey)}</span>
+            <span className={`badge ${q.status === 'warn' ? 'warn-tag' : 'ok-tag'}`}>{t(`quality.${q.status}` as MessageKey)}</span>
             <span>{issueText(t, q)}</span>
           </li>
         ))}

@@ -24,6 +24,9 @@ export default defineConfig({
     cssCodeSplit: false,
     sourcemap: false,
     chunkSizeWarningLimit: 2500,
+    // file:// cannot fetch sibling fonts (CORS) and the bundle is one classic script:
+    // brand images and fonts are embedded as data: URLs.
+    assetsInlineLimit: (file) => (/[\\/]src[\\/]assets[\\/]/.test(file) ? true : undefined),
     rollupOptions: {
       output: {
         // Single classic IIFE bundle: file:// cannot load ES modules or lazy chunks.

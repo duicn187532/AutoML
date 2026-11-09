@@ -6,6 +6,7 @@ import type { ColumnarTable } from '@/core/data/table';
 import type { DatasetRecord } from '@/core/project/types';
 import type { ForecastOutput } from '@/core/workers/types';
 import { useT } from '@/i18n';
+import { CHART } from '@/charts/palette';
 
 function chart(o: ForecastOutput): EChartsOption {
   const n = o.history.t.length, hold = o.holdout?.pred.length ?? 0;
@@ -21,10 +22,10 @@ function chart(o: ForecastOutput): EChartsOption {
     xAxis: { type: 'category', data: x, axisLabel: { hideOverlap: true } }, yAxis: { type: 'value', scale: true },
     dataZoom: undefined,
     series: [
-      { type: 'line', name: 'actual', data: [...o.history.y, ...pad(o.futureT.length)], symbol: 'none', lineStyle: { color: '#1c2330' } },
-      ...(o.holdout ? [{ type: 'line', name: 'holdout forecast', data: [...pad(n - hold), ...o.holdout.pred, ...pad(o.futureT.length)], symbol: 'none', lineStyle: { color: '#ea580c', type: 'dashed' } }, ...band(o.holdout.lo, o.holdout.hi, n - hold, 'holdout', '#ea580c')] : []),
-      { type: 'line', name: 'forecast', data: [...pad(n), ...o.forecast.pred], symbol: 'none', lineStyle: { color: '#2563eb' } },
-      ...band(o.forecast.lo, o.forecast.hi, n, 'forecast', '#2563eb'),
+      { type: 'line', name: 'actual', data: [...o.history.y, ...pad(o.futureT.length)], symbol: 'none', lineStyle: { color: CHART.ink } },
+      ...(o.holdout ? [{ type: 'line', name: 'holdout forecast', data: [...pad(n - hold), ...o.holdout.pred, ...pad(o.futureT.length)], symbol: 'none', lineStyle: { color: CHART.negative, type: 'dashed' } }, ...band(o.holdout.lo, o.holdout.hi, n - hold, 'holdout', CHART.negative)] : []),
+      { type: 'line', name: 'forecast', data: [...pad(n), ...o.forecast.pred], symbol: 'none', lineStyle: { color: CHART.primary } },
+      ...band(o.forecast.lo, o.forecast.hi, n, 'forecast', CHART.primary),
     ],
   };
 }
