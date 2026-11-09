@@ -164,7 +164,7 @@ function fitTfidf(col: Column, name: string, trainIdx: ArrayLike<number>, maxVoc
 }
 
 /** Smoothed target mean per category (m-estimate, m = 10); multiclass → one column per class. */
-function fitTargetEncoding(col: Column, name: string, trainIdx: ArrayLike<number>, target: { y: Float64Array; nClasses: number }): FeatureStep {
+function fitTargetEncoding(col: Column, name: string, trainIdx: ArrayLike<number>, target: { y: Float64Array; nClasses: number }): Extract<FeatureStep, { type: 'target' }> {
   const k = target.nClasses || 1;
   const outputs = target.nClasses > 2 ? k : 1;
   const enc = (y: number) => (target.nClasses > 2 ? Array.from({ length: k }, (_, c) => (y === c ? 1 : 0)) : [y]);
