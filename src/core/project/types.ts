@@ -66,6 +66,8 @@ export type PipelineStep =
   | { op: 'fillMissing'; column: string; value: string }
   | { op: 'filterRows'; column: string; cmp: FilterOp; value?: string }
   | { op: 'dropDuplicates'; columns: string[] }
+  /** Seeded random sample of n rows (stratified by `stratify` when given); keeps original row order. */
+  | { op: 'sampleRows'; n: number; seed: number; stratify?: string }
   | { op: 'dateExpand'; column: string; parts: ('year' | 'month' | 'day' | 'dow' | 'hour')[]; drop: boolean }
   | { op: 'mathTransform'; column: string; fn: 'log1p' | 'sqrt' | 'abs' | 'square'; output: string }
   | { op: 'interaction'; a: string; b: string; fn: '*' | '/' | '+' | '-'; output: string }

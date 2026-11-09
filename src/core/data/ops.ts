@@ -1,5 +1,6 @@
 import type { PipelineStep } from '../project/types';
 import { parseNumber } from './infer';
+import { Rng } from '../rng';
 import { cellString, getColumn, takeRows, type Column, type ColumnarTable } from './table';
 
 /**
@@ -123,6 +124,28 @@ export function applyStep(t: ColumnarTable, s: PipelineStep): ColumnarTable {
         if (!seen.has(key)) { seen.add(key); keep.push(i); }
       }
       return takeRows(t, keep);
+    }
+    case 'sampleRows': {
+      const n = Math.floor(s.n);
+      if (!(n > 0)) throw new Error('Sample size must be a positive number of rows');
+      if (n >= t.rowCount) return t;
+      const rng = new Rng(Math.floor(s.seed) >>> 0);
+      // group rows (one group, or one per stratum) and take a proportional share of each
+      const groups = new Map<string, number[]>();
+      const sc = s.stratify ? getColumn(t, s.stratify) : null;
+      for (let i = 0; i < t.rowCount; i++) {
+        const key = sc ? cellString(sc, i) ?? '' : '';
+        let g = groups.get(key);
+        if (!g) groups.set(key, (g = []));
+        g.push(i);
+      }
+      const keep: number[] = [];
+      for (const g of groups.values()) {
+        const k = Math.max(1, Math.round((g.length / t.rowCount) * n));
+        for (let i = g.length - 1; i > 0; i--) { const j = rng.int(i + 1); [g[i], g[j]] = [g[j], g[i]]; }
+        keep.push(...g.slice(0, Math.min(k, g.length)));
+      }
+      return takeRows(t, keep.sort((a, b) => a - b));
     }
     case 'dateExpand': {
       const c = getColumn(t, s.column);

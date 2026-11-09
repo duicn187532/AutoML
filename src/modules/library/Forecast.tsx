@@ -39,13 +39,14 @@ export function Forecast({ dataset, table }: { dataset: DatasetRecord; table: Co
   const [params, setParams] = useState<Record<string, number | string>>({ p: 1, d: 1, q: 1, trend: 'add', seasonal: 'add' });
   const [horizon, setHorizon] = useState(12);
   const [holdout, setHoldout] = useState(12);
+  const [aggregate, setAggregate] = useState<'sum' | 'mean'>('sum');
   const [out, setOut] = useState<ForecastOutput | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async () => {
     setBusy(true); setError(null);
     try {
-      setOut(await pool.submit({ kind: 'forecast', input: { table, timeColumn, valueColumn, method, params: method === 'arima' ? { p: params.p, d: params.d, q: params.q } : method === 'ets' ? { trend: params.trend, seasonal: params.seasonal } : { units: params.units ?? 32, epochs: params.epochs ?? 60 }, horizon, holdout } },
+      setOut(await pool.submit({ kind: 'forecast', input: { table, timeColumn, valueColumn, method, params: method === 'arima' ? { p: params.p, d: params.d, q: params.q } : method === 'ets' ? { trend: params.trend, seasonal: params.seasonal } : { units: params.units ?? 32, epochs: params.epochs ?? 60 }, horizon, holdout, aggregate } },
         { label: `${method} · ${valueColumn}`, engines: method === 'arima' || method === 'ets' ? ['pyodide', 'py-sklearn', 'py-stats'] : ['tfjs'] }).result);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   };
@@ -54,6 +55,7 @@ export function Forecast({ dataset, table }: { dataset: DatasetRecord; table: Co
       <div className="card form">
         <div className="field"><label>{t('fc.time')}</label><select value={timeColumn} onChange={(e) => setTime(e.currentTarget.value)}>{timeCols.map((c) => <option key={c.name}>{c.name}</option>)}</select></div>
         <div className="field"><label>{t('fc.value')}</label><select value={valueColumn} onChange={(e) => setValue(e.currentTarget.value)}>{valueCols.map((c) => <option key={c.name}>{c.name}</option>)}</select></div>
+        <div className="field"><label>{t('fc.aggregate')}</label><select value={aggregate} onChange={(e) => setAggregate(e.currentTarget.value as 'sum' | 'mean')} data-testid="fc-aggregate"><option value="sum">{t('fc.agg.sum')}</option><option value="mean">{t('fc.agg.mean')}</option></select></div>
         <div className="field"><label>{t('unsup.method')}</label><select value={method} onChange={(e) => setMethod(e.currentTarget.value as typeof method)} data-testid="fc-method"><option value="ets">ETS (Holt-Winters)</option><option value="arima">ARIMA</option><option value="lstm">LSTM</option><option value="gru">GRU</option><option value="tcn">TCN</option></select></div>
         {['lstm', 'gru', 'tcn'].includes(method) ? (
           <div className="row2">{(['units', 'epochs'] as const).map((k) => <div className="field" key={k}><label>{k}</label><input type="number" min={1} value={Number(params[k] ?? (k === 'units' ? 32 : 60))} onChange={(e) => setParams((p) => ({ ...p, [k]: Number(e.currentTarget.value) }))} /></div>)}</div>
@@ -74,6 +76,7 @@ export function Forecast({ dataset, table }: { dataset: DatasetRecord; table: Co
         {out && (
           <div className="card" data-testid="fc-result">
             <div className="row"><h3>{t('fc.result')}</h3><span className="small muted">{t('fc.freq', { freq: out.frequency, season: out.season || '—' })} · AIC {Number.isFinite(out.aic) ? out.aic.toFixed(1) : '—'} · {fmtDuration(out.durationMs)}</span></div>
+            {!!out.merged && <div className="advice info small">{t('fc.merged', { n: out.merged })}</div>}
             {out.holdout && <div className="metrics">{(['mae', 'rmse', 'mape'] as const).map((m) => <div className="metric" key={m}><div className="metric-label">{m.toUpperCase()} (holdout)</div><div className="metric-value">{fmtMetric(m, out.holdout![m])}</div></div>)}</div>}
             <EChart option={chart(out)} height={360} />
           </div>

@@ -1,3 +1,4 @@
+import { unsupervisedAdvice } from '@/core/models/advice';
 import { useState } from 'react';
 import { fmtDuration, fmtNum } from '@/app/format';
 import { pool } from '@/app/services';
@@ -91,6 +92,7 @@ export function Unsupervised({ dataset, table }: { dataset: DatasetRecord; table
           ))}</div>
         </details>
         <p className="small muted">{t(`unsup.hint.${spec.group}` as MessageKey)}</p>
+        {unsupervisedAdvice(method, dataset.rowCount).map((a, i) => <div key={i} className={`advice ${a.level}`}>{a.level === 'warn' ? '⚠ ' : 'ℹ '}{t.text(a.text)}</div>)}
         <button className="primary big" disabled={busy || !features.length} onClick={run} data-testid="unsup-run">{busy ? '…' : t('unsup.run')}</button>
         {error && <div className="error-text">{error}</div>}
       </div>

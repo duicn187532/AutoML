@@ -22,6 +22,7 @@ const STEP_FORMS: Record<Op, Field[]> = {
   fillMissing: [{ key: 'column', type: 'column' }, { key: 'value', type: 'text' }],
   filterRows: [{ key: 'column', type: 'column' }, { key: 'cmp', type: 'enum', options: ['<', '<=', '>', '>=', '==', '!=', 'in', 'notin', 'isna', 'notna'] }, { key: 'value', type: 'text' }],
   dropDuplicates: [{ key: 'columns', type: 'columns' }],
+  sampleRows: [{ key: 'n', type: 'number' }, { key: 'seed', type: 'number' }, { key: 'stratify', type: 'optColumn' }],
   dateExpand: [{ key: 'column', type: 'column' }, { key: 'parts', type: 'multi', options: ['year', 'month', 'day', 'dow', 'hour'] }, { key: 'drop', type: 'bool' }],
   mathTransform: [{ key: 'column', type: 'column' }, { key: 'fn', type: 'enum', options: ['log1p', 'sqrt', 'abs', 'square'] }, { key: 'output', type: 'text' }],
   interaction: [{ key: 'a', type: 'column' }, { key: 'fn', type: 'enum', options: ['*', '/', '+', '-'] }, { key: 'b', type: 'column' }, { key: 'output', type: 'text' }],
@@ -37,6 +38,7 @@ function defaultStep(op: Op, cols: string[]): PipelineStep {
     s[f.key] = f.type === 'column' ? cols[Math.min(nthColumn++, cols.length - 1)] ?? '' : f.type === 'columns' ? [] : f.type === 'number' ? 3 : f.type === 'numbers' ? [1] : f.type === 'enum' ? f.options![0]
       : f.type === 'bool' ? false : f.type === 'multi' ? [...f.options!.slice(0, 4)] : f.type === 'optColumn' ? undefined : '';
   }
+  if (op === 'sampleRows') Object.assign(s, { n: 3000, seed: 42 });
   return s as unknown as PipelineStep;
 }
 
