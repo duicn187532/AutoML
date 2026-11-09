@@ -2,10 +2,11 @@ import type * as TF from '@tensorflow/tfjs';
 import { analyze, analysisOk } from '../../dag/graph';
 import { balanceLoss, compileGraph, type CompileContext } from '../../dag/compile';
 import { getColumn } from '../../data/table';
-import { takeMatrixRows, takeVector, type Matrix } from '../../ml/matrix';
+import { takeVector, type Matrix } from '../../ml/matrix';
 import { classificationMetrics, regressionMetrics, type MetricSet } from '../../ml/metrics';
 import { DEFAULT_PREPROCESS, encodeTarget, fitPreprocessor, fitTarget, inferTask, transform, type TargetState } from '../../ml/preprocess';
 import { holdoutSplit, kFold } from '../../ml/split';
+import { prepareExpertFold, toOuterTargetScale } from '../../ml/expertFold';
 import { defaultParams } from '../../models/params';
 import { getPlugin } from '../../models/registry';
 import { Rng } from '../../rng';
@@ -175,8 +176,13 @@ export async function trainGraphTask(input: TrainGraphInput, ctx: TaskContext): 
       };
       for (const [fi, f] of folds.entries()) {
         ctx.progress({ fraction: (ei * (folds.length + 1) + fi) / (expertNodes.length * (folds.length + 1)) * 0.7, message: `expert ${en.label ?? pluginId} fold ${fi + 1}` });
-        const o = await fitPredict(takeMatrixRows(Xtr, f.train), takeVector(ytr, f.train), takeMatrixRows(Xtr, f.valid), `${en.id}-${fi}`);
-        for (let i = 0; i < f.valid.length; i++) for (let j = 0; j < k; j++) P[(f.valid[i] * expertNodes.length + ei) * k + j] = o[i * k + j];
+        // Inner validation rows must not affect expert preprocessing or regression scaling.
+        const part = prepareExpertFold(table, features, trainRows, f, h.col, h.y, targets[h.id]);
+        const o = await fitPredict(part.Xtrain, part.ytrain, part.Xvalid, `${en.id}-${fi}`);
+        for (let i = 0; i < f.valid.length; i++) for (let j = 0; j < k; j++) {
+          const pred = cls ? o[i * k + j] : toOuterTargetScale(o[i * k + j], part.target, targets[h.id]);
+          P[(f.valid[i] * expertNodes.length + ei) * k + j] = pred;
+        }
       }
       const t1 = performance.now();
       const o = await fitPredict(Xtr, ytr, Xva, `${en.id}-full`);
@@ -219,7 +225,7 @@ export async function trainGraphTask(input: TrainGraphInput, ctx: TaskContext): 
       gates[gate.id] = gateStats(w.dataSync() as Float32Array, E, Xva, prep.outputNames);
       w.dispose();
       weightsOut = model.getWeights().map((x) => ({ shape: x.shape, data: Array.from(x.dataSync()) }));
-      notes.push('two-stage: experts trained with 5-fold OOF predictions, then the gate on top (experts frozen)');
+      notes.push('two-stage: fold-local preprocessing/target scaling, 5-fold OOF expert predictions and frozen-expert gate');
     } finally {
       tf.dispose([xT, pT, yTr, xV, pV, yV]);
       model.dispose();

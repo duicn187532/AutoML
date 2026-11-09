@@ -2,7 +2,7 @@ import { cellString, getColumn, type ColumnarTable } from '../../data/table';
 import { takeVector, type Matrix } from '../../ml/matrix';
 import { classificationMetrics, regressionMetrics, rocCurve, type MetricSet } from '../../ml/metrics';
 import { encodeTarget, fitPreprocessor, fitTarget, inferTask, labelledRows, transform, transformTraining, type PreprocessorState, type TargetState, type TaskKind } from '../../ml/preprocess';
-import { groupKFold, groupSplit, holdoutSplit, kFold, timeSplit, type Fold, type SplitConfig, type SplitIndices } from '../../ml/split';
+import { groupKFold, groupSplit, holdoutSplit, kFold, parseTimeValue, timeSplit, type Fold, type SplitConfig, type SplitIndices } from '../../ml/split';
 import { validateParams } from '../../models/params';
 import { getPlugin } from '../../models/registry';
 import type { ModelArtifact, ModelPlugin, ParamValues, TrainedModel } from '../../models/types';
@@ -118,7 +118,12 @@ export async function trainTask(input: TrainInput, ctx: TaskContext): Promise<Tr
   // 1. carve out the test part (never touched until the end)
   let outer: SplitIndices;
   const vf = split.kind === 'kfold' ? 0 : split.validFraction;
-  if (split.kind === 'time') outer = timeSplit(colValues(split.column!) as number[], { validFraction: vf, testFraction: split.testFraction });
+  if (split.kind === 'time') {
+    if (!split.column) throw new Error('Time split requires a time column');
+    const column = getColumn(table, split.column);
+    const order = Array.from(labelled, (r) => parseTimeValue(column.kind === 'numeric' ? column.values[r] : cellString(column, r)));
+    outer = timeSplit(order, { validFraction: vf, testFraction: split.testFraction });
+  }
   else if (split.kind === 'group') outer = groupSplit(colValues(split.column!), splitRng, { validFraction: vf, testFraction: split.testFraction });
   else outer = holdoutSplit(labelled.length, splitRng, { validFraction: vf, testFraction: split.testFraction, stratify: strat });
   const rows = (ix: Int32Array) => takeVector(labelled, ix);

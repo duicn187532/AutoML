@@ -1,5 +1,36 @@
 import type { Rng } from '../rng';
 
+/**
+ * Parse a timestamp into a comparable UTC millisecond value.
+ * Calendar dates without a timezone are interpreted as UTC for reproducibility.
+ * Numeric values represent a consistent user-supplied chronological scale.
+ */
+export function parseTimeValue(value: string | number | null): number {
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error('Time split contains a missing or non-finite timestamp');
+    return value;
+  }
+  const s = value?.trim();
+  if (!s) throw new Error('Time split contains a missing timestamp');
+  const m = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(\.\d{1,3})?)?(Z|[+-]\d{2}:\d{2})?)?$/.exec(s);
+  if (!m) throw new Error(`Unparseable time split value: ${s}`);
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  const h = Number(m[4] ?? 0), min = Number(m[5] ?? 0), sec = Number(m[6] ?? 0);
+  const ms = Number((m[7] ?? '').slice(1).padEnd(3, '0'));
+  const day = new Date(Date.UTC(y, mo - 1, d));
+  if (y < 100 || day.getUTCFullYear() !== y || day.getUTCMonth() !== mo - 1 || day.getUTCDate() !== d
+    || h > 23 || min > 59 || sec > 59) throw new Error(`Invalid time split date: ${s}`);
+  let offset = 0;
+  const tz = m[8];
+  if (tz && tz !== 'Z') {
+    const zh = Number(tz.slice(1, 3)), zm = Number(tz.slice(4, 6));
+    if (zh > 14 || zm > 59 || (zh === 14 && zm !== 0)) throw new Error(`Invalid time zone offset: ${s}`);
+    offset = (tz[0] === '+' ? 1 : -1) * (zh * 60 + zm);
+  }
+  return Date.UTC(y, mo - 1, d, h, min, sec, ms) - offset * 60_000;
+}
+
+
 export interface SplitIndices {
   train: Int32Array;
   valid: Int32Array;
@@ -84,10 +115,18 @@ export interface SplitConfig {
 /** Time-ordered split: oldest rows train, then valid, newest rows test (no shuffling). */
 export function timeSplit(order: ArrayLike<number>, opts: { validFraction: number; testFraction?: number }): SplitIndices {
   const n = order.length;
+  const vf = opts.validFraction, tf = opts.testFraction ?? 0;
+  if (!Number.isFinite(vf) || !Number.isFinite(tf) || vf < 0 || tf < 0 || vf + tf >= 1)
+    throw new RangeError('validFraction + testFraction must be in [0, 1)');
+  for (let i = 0; i < n; i++) if (!Number.isFinite(order[i])) throw new Error(`Time split row ${i} has an invalid timestamp`);
   const idx = Array.from({ length: n }, (_, i) => i).sort((a, b) => (order[a] < order[b] ? -1 : order[a] > order[b] ? 1 : a - b));
-  const nTest = Math.round(n * (opts.testFraction ?? 0)), nValid = Math.round(n * opts.validFraction);
+  const nTest = Math.round(n * tf), nValid = Math.round(n * vf);
   const nTrain = n - nTest - nValid;
   if (nTrain < 1) throw new RangeError('validFraction + testFraction too large');
+  for (const at of [nTrain, nTrain + nValid]) {
+    if (at > 0 && at < n && order[idx[at - 1]] === order[idx[at]])
+      throw new Error('Time split boundary divides identical timestamps; use a finer time column or different fractions');
+  }
   return {
     train: sortI32(idx.slice(0, nTrain)),
     valid: sortI32(idx.slice(nTrain, nTrain + nValid)),
