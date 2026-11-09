@@ -4,24 +4,25 @@ import { ImageLabeler } from './Images';
 import { fmtBytes } from '@/app/format';
 import { useProject } from '@/app/stores/project';
 import { useUi } from '@/app/stores/ui';
-import { cellString, type ColumnKind, type ColumnarTable } from '@/core/data/table';
+import { cellString, getColumn, type ColumnKind, type ColumnarTable } from '@/core/data/table';
 import { newId } from '@/core/util/id';
 import { newPipeline } from '@/core/project/types';
+import { datasetTarget } from '@/core/project/target';
 import { Clean } from './Clean';
 import { Explore } from './Explore';
 import { useProfile, useTable } from './hooks';
 import { ColumnsTable, QualityReport } from './Overview';
 import { useT, type MessageKey } from '@/i18n';
+import { PageHeader } from '@/app/ui/Page';
+import { inferTask } from '@/core/ml/preprocess';
 import { SAMPLES, SAMPLE_GROUPS, sampleBytes, type Sample } from './samples';
 import { engineLoader } from '@/app/services';
 import { ACCEPTED_EXTENSIONS } from '@/core/data/formats';
 
 const PREVIEW_ROWS = 50;
 
-function ImportBar() {
-  const t = useT();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const folderRef = useRef<HTMLInputElement>(null);
+/** Shared import logic for the first-run hero and the compact bar. */
+function useImporter() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sample, setSample] = useState<Sample | null>(null);
@@ -37,68 +38,178 @@ function ImportBar() {
       setBusy(false);
     }
   };
+  const importFile = (f: File) => run(async () => importCsvFile(f.name, await f.arrayBuffer()));
+  const loadSample = (s: Sample) => { setSample(s); return run(async () => importCsvFile(s.fileName, await sampleBytes(s, (n) => engineLoader.load(n)), 'sample', s.target)); };
+  return { error, busy, sample, run, importFile, loadSample };
+}
+type Importer = ReturnType<typeof useImporter>;
+
+const FEATURED = ['titanic', 'iris', 'diabetes', 'air-passengers'];
+
+function FileInputs({ imp, inputRef, folderRef }: { imp: Importer; inputRef: React.RefObject<HTMLInputElement | null>; folderRef: React.RefObject<HTMLInputElement | null> }) {
   return (
-    <div className="card import-bar">
-      <button className="primary" disabled={busy} onClick={() => inputRef.current?.click()}>
-        {t('data.import')}
-      </button>
-      <input
-        ref={inputRef}
-        type="file"
-        accept={ACCEPTED_EXTENSIONS}
-        hidden
-        data-testid="csv-input"
-        onChange={async (e) => {
-          const f = e.currentTarget.files?.[0];
-          e.currentTarget.value = '';
-          if (f) await run(async () => importCsvFile(f.name, await f.arrayBuffer()));
-        }}
-      />
-      <button disabled={busy} onClick={() => folderRef.current?.click()} data-testid="img-folder">{t('img.importFolder')}</button>
+    <>
+      <input ref={inputRef} type="file" accept={ACCEPTED_EXTENSIONS} hidden data-testid="csv-input" onChange={async (e) => {
+        const f = e.currentTarget.files?.[0];
+        e.currentTarget.value = '';
+        if (f) await imp.importFile(f);
+      }} />
       <input ref={folderRef} type="file" hidden multiple {...{ webkitdirectory: '' }} onChange={async (e) => {
         const files = [...(e.currentTarget.files ?? [])];
         e.currentTarget.value = '';
         const root = ((files[0] as File & { webkitRelativePath?: string })?.webkitRelativePath ?? 'images').split('/')[0];
-        if (files.length) await run(() => importImages(files, root));
+        if (files.length) await imp.run(() => importImages(files, root));
       }} />
-      <span className="muted small">{t('data.importHint')}</span>
-      <div className="spacer" />
-      <select value="" disabled={busy} data-testid="sample-select" onChange={(e) => {
-        const s = SAMPLES.find((x) => x.id === e.currentTarget.value);
-        if (s) { setSample(s); void run(async () => importCsvFile(s.fileName, await sampleBytes(s, (n) => engineLoader.load(n)), 'sample')); }
-      }}>
-        <option value="">{t('data.loadSample')}…</option>
-        {SAMPLE_GROUPS.map((g) => (
-          <optgroup key={g} label={t(`data.sampleGroup.${g}` as MessageKey)}>
-            {SAMPLES.filter((s) => s.group === g).map((s) => <option key={s.id} value={s.id}>{t.text(s.label)}</option>)}
-          </optgroup>
+    </>
+  );
+}
+
+function SampleSelect({ imp, label }: { imp: Importer; label: string }) {
+  const t = useT();
+  return (
+    <select value="" disabled={imp.busy} data-testid="sample-select" onChange={(e) => {
+      const s = SAMPLES.find((x) => x.id === e.currentTarget.value);
+      if (s) void imp.loadSample(s);
+    }}>
+      <option value="">{label}</option>
+      {SAMPLE_GROUPS.map((g) => (
+        <optgroup key={g} label={t(`data.sampleGroup.${g}` as MessageKey)}>
+          {SAMPLES.filter((s) => s.group === g).map((s) => <option key={s.id} value={s.id}>{t.text(s.label)}</option>)}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
+function SampleNote({ imp }: { imp: Importer }) {
+  const t = useT();
+  const sample = imp.sample;
+  if (!sample || imp.error) return null;
+  return (
+    <div className="sample-note small full" data-testid="sample-note">
+      <div><strong>{t.text(sample.label)}</strong> · {t('lib.target')}: <code>{sample.target}</code></div>
+      {sample.hint && <div>{t.text(sample.hint)}</div>}
+      {sample.source && <div className="muted">{t('data.sampleSource')}: {sample.source.cite} · {sample.source.licence} · <a href={sample.source.url} target="_blank" rel="noopener noreferrer">{sample.source.url}</a></div>}
+    </div>
+  );
+}
+
+function SampleCatalog() {
+  const t = useT();
+  return (
+    <details className="full sample-catalog">
+      <summary>{t('data.sampleCatalog', { n: SAMPLES.length })}</summary>
+      <div className="table-wrap">
+        <table className="grid">
+          <thead><tr><th>{t('data.sampleName')}</th><th>{t('lib.target')}</th><th>{t('data.sampleSize')}</th><th>{t('data.sampleSource')}</th><th>{t('data.sampleLicence')}</th></tr></thead>
+          <tbody>
+            {SAMPLES.map((s) => (
+              <tr key={s.id}>
+                <td>{t.text(s.label)}</td><td><code>{s.target}</code></td><td className="num">{s.size}</td>
+                <td className="cite">{s.source ? <a href={s.source.url} target="_blank" rel="noopener noreferrer">{s.source.cite}</a> : t('data.sampleSynthetic')}</td>
+                <td>{s.source?.licence ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
+/** Accept a dropped data file anywhere inside the wrapped area. */
+function useDrop(imp: Importer) {
+  const [over, setOver] = useState(false);
+  return {
+    over,
+    props: {
+      onDragOver: (e: React.DragEvent) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setOver(true); } },
+      onDragLeave: (e: React.DragEvent) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false); },
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault();
+        setOver(false);
+        const f = e.dataTransfer.files?.[0];
+        if (f) void imp.importFile(f);
+      },
+    },
+  };
+}
+
+/** First run: big drop zone and one-click samples. */
+function ImportHero({ imp }: { imp: Importer }) {
+  const t = useT();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
+  const drop = useDrop(imp);
+  return (
+    <div className="hero">
+      <div className={drop.over ? 'dropzone over' : 'dropzone'} {...drop.props} data-testid="dropzone">
+        <div className="dropzone-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="34" height="34"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </div>
+        <h2>{drop.over ? t('data.hero.drop') : t('data.hero.title')}</h2>
+        <p className="muted">{t('data.hero.body')}</p>
+        <div className="row center">
+          <button className="primary big" disabled={imp.busy} onClick={() => inputRef.current?.click()}>{imp.busy ? '…' : t('data.import')}</button>
+          <button className="big" disabled={imp.busy} onClick={() => folderRef.current?.click()} data-testid="img-folder">{t('img.importFolder')}</button>
+        </div>
+        <p className="small muted">{t('data.hero.private')}</p>
+        <FileInputs imp={imp} inputRef={inputRef} folderRef={folderRef} />
+      </div>
+      {imp.error && <div className="error-text">{imp.error}</div>}
+      <h3 className="hero-sub">{t('data.hero.try')}</h3>
+      <div className="sample-cards">
+        {FEATURED.map((id) => SAMPLES.find((s) => s.id === id)).filter((s): s is Sample => !!s).map((s) => (
+          <button key={s.id} className="sample-card" disabled={imp.busy} onClick={() => void imp.loadSample(s)} data-testid={`sample-card-${s.id}`}>
+            <span className="sample-card-group">{t(`data.sampleGroup.${s.group}` as MessageKey)}</span>
+            <strong>{t.text(s.label)}</strong>
+            <span className="small muted">{s.size} · {t('lib.target')} <code>{s.target}</code></span>
+          </button>
         ))}
-      </select>
-      {error && <div className="error-text small full">{error}</div>}
-      {sample && !error && (
-        <div className="sample-note small full" data-testid="sample-note">
-          <div><strong>{t.text(sample.label)}</strong> · {t('lib.target')}: <code>{sample.target}</code></div>
-          {sample.hint && <div>{t.text(sample.hint)}</div>}
-          {sample.source && <div className="muted">{t('data.sampleSource')}: {sample.source.cite} · {sample.source.licence} · <a href={sample.source.url} target="_blank" rel="noopener noreferrer">{sample.source.url}</a></div>}
-        </div>
-      )}
-      <details className="full sample-catalog">
-        <summary>{t('data.sampleCatalog', { n: SAMPLES.length })}</summary>
-        <div className="table-wrap">
-          <table className="grid">
-            <thead><tr><th>{t('data.sampleName')}</th><th>{t('lib.target')}</th><th>{t('data.sampleSize')}</th><th>{t('data.sampleSource')}</th><th>{t('data.sampleLicence')}</th></tr></thead>
-            <tbody>
-              {SAMPLES.map((s) => (
-                <tr key={s.id}>
-                  <td>{t.text(s.label)}</td><td><code>{s.target}</code></td><td className="num">{s.size}</td>
-                  <td className="cite">{s.source ? <a href={s.source.url} target="_blank" rel="noopener noreferrer">{s.source.cite}</a> : t('data.sampleSynthetic')}</td>
-                  <td>{s.source?.licence ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
+      </div>
+      <div className="row">
+        <SampleSelect imp={imp} label={t('data.hero.more')} />
+      </div>
+      <SampleCatalog />
+    </div>
+  );
+}
+
+/** Once a dataset exists: compact import row. */
+function ImportBar({ imp }: { imp: Importer }) {
+  const t = useT();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const folderRef = useRef<HTMLInputElement>(null);
+  const drop = useDrop(imp);
+  return (
+    <div className={drop.over ? 'card import-bar over' : 'card import-bar'} {...drop.props}>
+      <button className="primary" disabled={imp.busy} onClick={() => inputRef.current?.click()}>
+        {t('data.import')}
+      </button>
+      <button disabled={imp.busy} onClick={() => folderRef.current?.click()} data-testid="img-folder">{t('img.importFolder')}</button>
+      <SampleSelect imp={imp} label={`${t('data.loadSample')}…`} />
+      <span className="muted small import-hint">{t('data.importHint')}</span>
+      <FileInputs imp={imp} inputRef={inputRef} folderRef={folderRef} />
+      {imp.error && <div className="error-text small full">{imp.error}</div>}
+      <SampleNote imp={imp} />
+      <SampleCatalog />
+    </div>
+  );
+}
+
+/** "What now?" strip under the dataset header: names the target and task and points to training. */
+function NextStep({ target, table }: { target: string; table: ColumnarTable | null | undefined }) {
+  const t = useT();
+  if (!table || !target || !table.columns.some((c) => c.name === target)) return null;
+  const task = inferTask(getColumn(table, target));
+  return (
+    <div className="next-step" data-testid="next-step">
+      <div className="next-step-text">
+        <strong>{t('data.next.title')}</strong>
+        <span>{t('data.next.body', { target, task: t(`task.kind.${task}` as MessageKey) })}</span>
+      </div>
+      <button className="primary" onClick={() => useUi.getState().setModule('auto')} data-testid="next-auto">{t('data.next.auto')} →</button>
+      <button onClick={() => useUi.getState().setModule('library')}>{t('data.next.library')}</button>
     </div>
   );
 }
@@ -143,8 +254,8 @@ export function DataModule() {
   const dataset = project?.datasets.find((d) => d.id === datasetId);
   const table = useTable(dataset?.id);
   const [tab, setTab] = useState<Tab>('overview');
-  const [targetSel, setTarget] = useState<{ id: string; col: string } | null>(null);
-  const target = targetSel && targetSel.id === dataset?.id ? targetSel.col : dataset?.columns.at(-1)?.name;
+  const imp = useImporter();
+  const target = dataset ? datasetTarget(dataset) : undefined;
   const profile = useProfile(dataset?.id, table, target || undefined);
   const parent = dataset?.derivedFrom ? project?.datasets.find((d) => d.id === dataset.derivedFrom!.datasetId) : undefined;
 
@@ -158,13 +269,13 @@ export function DataModule() {
 
   return (
     <div className="module">
-      <h1>{t('nav.data')}</h1>
-      <ImportBar />
+      <PageHeader id="data" />
       {!dataset ? (
-        <p className="muted">{project?.datasets.length ? t('data.select') : t('panel.data.empty')}</p>
+        <ImportHero imp={imp} />
       ) : (
         <>
-          <div className="card">
+          <ImportBar imp={imp} />
+          <div className="card dataset-card">
             <div className="row">
               <h2>{dataset.name}</h2>
               <span className="muted">
@@ -173,13 +284,13 @@ export function DataModule() {
               </span>
               {parent && <button className="link" onClick={() => useUi.getState().selectDataset(parent.id)}>← {t('data.derivedFrom', { name: parent.name })}</button>}
               <div className="spacer" />
-              <label className="small">
-                {t('lib.target')}{' '}
-                <select value={target} onChange={(e) => setTarget({ id: dataset.id, col: e.currentTarget.value })} data-testid="data-target">
+              <label className="target-pick">
+                {t('lib.target')}
+                <select value={target} onChange={(e) => useProject.getState().setDatasetTarget(dataset.id, e.currentTarget.value)} data-testid="data-target">
                   {dataset.columns.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
                 </select>
               </label>
-              <button className="danger" onClick={() => { removeDataset(dataset.id); useUi.getState().selectDataset(null); }}>
+              <button className="danger ghost" onClick={() => { if (confirm(t('data.confirmDelete', { name: dataset.name }))) { removeDataset(dataset.id); useUi.getState().selectDataset(null); } }}>
                 {t('data.delete')}
               </button>
             </div>
@@ -189,6 +300,7 @@ export function DataModule() {
                 <ul>{dataset.warnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
               </details>
             ) : null}
+            {!dataset.images && <NextStep target={target ?? ''} table={table} />}
             {!dataset.images && <div className="tabs" role="tablist">
               {(['overview', 'explore', 'clean', 'preview'] as Tab[]).map((k) => (
                 <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'tab active' : 'tab'} onClick={() => setTab(k)} data-testid={`tab-${k}`}>

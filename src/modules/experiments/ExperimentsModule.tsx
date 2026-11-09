@@ -9,6 +9,9 @@ import type { ExperimentRecord } from '@/core/project/types';
 import { useT, type MessageKey } from '@/i18n';
 import { ExperimentResult } from '../library/LibraryModule';
 import { PredictPanel } from './PredictPanel';
+import { EmptyState, PageHeader } from '@/app/ui/Page';
+import { MODULE_ICONS } from '@/app/icons';
+import { useUi } from '@/app/stores/ui';
 
 type SortKey = 'createdAt' | 'name' | 'durationMs' | MetricName;
 
@@ -62,9 +65,12 @@ export function ExperimentsModule() {
 
   return (
     <div className="module">
-      <h1>{t('exp.title')}</h1>
+      <PageHeader id="experiments" />
       {exps.length === 0 ? (
-        <p className="muted">{t('exp.empty')}</p>
+        <EmptyState icon={MODULE_ICONS.experiments} title={t('empty.exp.title')} body={t('empty.exp.body')}>
+          <button className="primary big" onClick={() => useUi.getState().setModule('auto')}>{t('empty.exp.auto')} →</button>
+          <button className="big" onClick={() => useUi.getState().setModule('library')}>{t('empty.exp.library')}</button>
+        </EmptyState>
       ) : (
         <>
           <div className="card">

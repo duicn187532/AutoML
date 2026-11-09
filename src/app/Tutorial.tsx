@@ -8,9 +8,9 @@ import { useUi, type ModuleId } from './stores/ui';
 const STEPS: { key: string; module: ModuleId }[] = [
   { key: 'import', module: 'data' },
   { key: 'quality', module: 'data' },
-  { key: 'train', module: 'library' },
   { key: 'auto', module: 'auto' },
   { key: 'experiments', module: 'experiments' },
+  { key: 'train', module: 'library' },
   { key: 'advanced', module: 'dag' },
 ];
 const SEEN = 'aml.tutorialSeen';
@@ -31,7 +31,7 @@ export function Tutorial({ onClose }: { onClose: () => void }) {
       setBusy(true);
       try {
         const s = SAMPLES.find((x) => x.id === 'titanic')!;
-        const d = await importCsvFile(s.fileName, await sampleBytes(s, (n) => engineLoader.load(n)), 'sample');
+        const d = await importCsvFile(s.fileName, await sampleBytes(s, (n) => engineLoader.load(n)), 'sample', s.target);
         useUi.getState().selectDataset(d.id);
       } finally { setBusy(false); }
     }

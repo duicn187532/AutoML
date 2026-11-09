@@ -11,13 +11,16 @@ function DatasetsPanel() {
   const { datasetId, selectDataset } = useUi();
   return (
     <section className="panel">
-      <h3>{t('panel.data')}</h3>
+      <div className="panel-head">
+        <h3>{t('panel.data')}</h3>
+        <button className="link small" onClick={() => { selectDataset(null); useUi.getState().setModule('data'); }} data-testid="panel-import">+ {t('data.import')}</button>
+      </div>
       {datasets.length === 0 && <p className="muted small">{t('panel.data.empty')}</p>}
       <ul className="list">
         {datasets.map((d) => (
           <li key={d.id}>
             <button className={d.id === datasetId ? 'list-item active' : 'list-item'} onClick={() => selectDataset(d.id)} data-testid="dataset-item">
-              <span className="list-title">{d.name}</span>
+              <span className="list-title">{d.images ? '🖼 ' : ''}{d.name}</span>
               <span className="muted small">
                 {t('data.rows', { n: d.rowCount.toLocaleString() })} · {t('data.cols', { n: d.columns.length })}
               </span>
@@ -36,9 +39,9 @@ function TasksPanel() {
     <section className="panel grow">
       <div className="panel-head">
         <h3>{t('panel.tasks')}</h3>
-        <button className="link" onClick={() => (paused ? pool.resume() : pool.pause())} data-testid="queue-pause">{paused ? `▶ ${t('task.resume')}` : `⏸ ${t('task.pause')}`}</button>
+        <button className="link small q-btn" title={paused ? t('task.resume') : t('task.pause')} aria-label={paused ? t('task.resume') : t('task.pause')} onClick={() => (paused ? pool.resume() : pool.pause())} data-testid="queue-pause">{paused ? '▶' : '❚❚'}</button>
         {tasks.some((x) => x.status !== 'running' && x.status !== 'queued') && (
-          <button className="link" onClick={clearFinished}>
+          <button className="link small" onClick={clearFinished}>
             {t('task.clear')}
           </button>
         )}

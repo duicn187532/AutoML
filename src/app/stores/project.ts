@@ -32,7 +32,9 @@ interface ProjectState {
   newProject(): Promise<void>;
   rename(name: string): void;
   setSeed(seed: number): void;
-  addDataset(table: ColumnarTable, meta: Pick<DatasetRecord, 'name' | 'source' | 'warnings' | 'derivedFrom'>): Promise<DatasetRecord>;
+  addDataset(table: ColumnarTable, meta: Pick<DatasetRecord, 'name' | 'source' | 'warnings' | 'derivedFrom' | 'target'>): Promise<DatasetRecord>;
+  /** Remember which column a dataset predicts (used as the default target everywhere). */
+  setDatasetTarget(id: string, target: string): void;
   upsertPipeline(p: PipelineRecord): void;
   upsertScript(s: ScriptRecord): void;
   upsertGraph(g: GraphRecord): void;
@@ -105,6 +107,7 @@ export const useProject = create<ProjectState>((set, get) => {
         source: meta.source,
         warnings: meta.warnings,
         derivedFrom: meta.derivedFrom,
+        target: meta.target && table.columns.some((c) => c.name === meta.target) ? meta.target : undefined,
         rowCount: table.rowCount,
         columns: table.columns.map((c) => profileColumn(c)),
         blobKey: datasetBlobKey(id),
@@ -116,6 +119,9 @@ export const useProject = create<ProjectState>((set, get) => {
       update((q) => ({ ...q, datasets: [...q.datasets, record] }));
       return record;
     },
+
+    setDatasetTarget: (id, target) =>
+      update((q) => ({ ...q, datasets: q.datasets.map((d) => (d.id === id && d.target !== target ? { ...d, target } : d)) })),
 
     upsertPipeline: (rec) =>
       update((q) => ({

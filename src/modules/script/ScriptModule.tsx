@@ -6,6 +6,7 @@ import type { ScriptRecord } from '@/core/project/types';
 import { newId } from '@/core/util/id';
 import type { PyRunOutput } from '@/core/workers/types';
 import { useT } from '@/i18n';
+import { PageHeader } from '@/app/ui/Page';
 
 const STARTER = (dataset?: string) => [
   `# ${dataset ? '' : 'Import a dataset first. '}Workbench API: aml.datasets(), aml.load(name), aml.save_dataset(df, name)\nimport pandas as pd\nimport numpy as np${dataset ? `\ndf = aml.load(${JSON.stringify(dataset)})\ndf.describe()` : ''}`,
@@ -88,7 +89,7 @@ export function ScriptModule() {
 
   return (
     <div className="module">
-      <h1>{t('nav.script')}</h1>
+      <PageHeader id="script" />
       <div className="card">
         <div className="row">
           <button className="primary" disabled={!!running} onClick={runAll} data-testid="script-run-all">{t('script.runAll')}</button>

@@ -8,10 +8,12 @@ import { LiveCurve } from '@/charts/LiveCurve';
 import type { Preset } from '@/core/auto/portfolio';
 import { getColumn } from '@/core/data/table';
 import { inferTask } from '@/core/ml/preprocess';
+import { datasetTarget } from '@/core/project/target';
 import { safeFileName } from '@/core/security/escape';
 import type { AutoOutput } from '@/core/workers/types';
 import { useT, type MessageKey } from '@/i18n';
-import { useTable } from '../data/hooks';
+import { useLeakage, useTable } from '../data/hooks';
+import { NeedData, PageHeader } from '@/app/ui/Page';
 
 const BUDGET: Record<Preset, number> = { fast: 60, balanced: 300, best: 900 };
 
@@ -21,8 +23,10 @@ export function AutoModule() {
   const datasetId = useUi((s) => s.datasetId) ?? project.datasets[0]?.id;
   const dataset = project.datasets.find((d) => d.id === datasetId);
   const table = useTable(dataset?.id);
-  const [targetSel, setTarget] = useState<{ id: string; col: string } | null>(null);
-  const target = targetSel?.id === dataset?.id ? targetSel!.col : dataset?.columns.at(-1)?.name ?? '';
+  const target = dataset ? datasetTarget(dataset) : '';
+  const leak = useLeakage(dataset?.id, table, target || undefined);
+  const [keepLeakFor, setKeepLeakFor] = useState<string | null>(null);
+  const keepLeak = keepLeakFor === `${dataset?.id}|${target}`;
   const [preset, setPreset] = useState<Preset>('balanced');
   const [budget, setBudget] = useState<number | null>(null);
   const [testFraction, setTestFraction] = useState(0.2);
@@ -35,8 +39,9 @@ export function AutoModule() {
   const points = useTasks((s) => (taskId ? s.points[taskId] : undefined));
   const running = live?.status === 'running' || live?.status === 'queued';
 
-  if (!dataset) return <div className="module"><h1>{t('nav.auto')}</h1><p className="muted">{t('panel.data.empty')}</p></div>;
-  const features = dataset.columns.filter((c) => c.name !== target && c.kind !== 'id' && c.kind !== 'text').map((c) => c.name);
+  if (!dataset) return <NeedData id="auto" />;
+  const excluded = keepLeak ? [] : leak.columns;
+  const features = dataset.columns.filter((c) => c.name !== target && c.kind !== 'id' && c.kind !== 'text' && !excluded.includes(c.name)).map((c) => c.name);
 
   const run = async () => {
     if (!task) return;
@@ -57,9 +62,9 @@ export function AutoModule() {
   const metrics = task === 'regression' ? REGRESSION_METRICS : CLASSIFICATION_METRICS;
   return (
     <div className="module">
-      <h1>{t('nav.auto')}</h1>
+      <PageHeader id="auto" />
       <div className="card form auto-form">
-        <div className="row">
+        <div className="form-grid">
           <div className="field">
             <label>{t('exp.dataset')}</label>
             <select value={dataset.id} onChange={(e) => useUi.getState().selectDataset(e.currentTarget.value)}>
@@ -68,12 +73,28 @@ export function AutoModule() {
           </div>
           <div className="field">
             <label>{t('lib.target')}</label>
-            <select value={target} onChange={(e) => setTarget({ id: dataset.id, col: e.currentTarget.value })} data-testid="auto-target">
+            <select value={target} onChange={(e) => useProject.getState().setDatasetTarget(dataset.id, e.currentTarget.value)} data-testid="auto-target">
               {dataset.columns.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
             </select>
-            {task && <div className="hint">{t('lib.taskKind')}: <strong>{t(`task.kind.${task}` as MessageKey)}</strong> · {t('auto.features', { n: features.length })}</div>}
+          </div>
+          <div className="field">
+            <label>{t('auto.budget')}</label>
+            <input type="number" min={10} max={7200} value={budget ?? BUDGET[preset]} onChange={(e) => setBudget(Number(e.currentTarget.value))} />
           </div>
         </div>
+        {task && (
+          <div className="chips">
+            <span className="chip accent">{t(`task.kind.${task}` as MessageKey)}</span>
+            <span className="chip">{t('auto.features', { n: features.length })}</span>
+            <span className="chip">{t('data.rows', { n: dataset.rowCount.toLocaleString() })}</span>
+          </div>
+        )}
+        {leak.columns.length > 0 && (
+          <div className="advice warn" data-testid="leak-note">
+            ⚠ {t(keepLeak ? 'auto.leakKept' : 'auto.leakExcluded', { cols: leak.columns.join(', ') })}{' '}
+            <button className="link" onClick={() => setKeepLeakFor(keepLeak ? null : `${dataset.id}|${target}`)}>{t(keepLeak ? 'auto.leakExclude' : 'auto.leakKeep')}</button>
+          </div>
+        )}
         <div className="presets" role="radiogroup">
           {(['fast', 'balanced', 'best'] as Preset[]).map((p) => (
             <label key={p} className={preset === p ? 'preset active' : 'preset'}>
@@ -83,22 +104,23 @@ export function AutoModule() {
             </label>
           ))}
         </div>
-        <div className="row">
-          <div className="field">
-            <label>{t('auto.budget')}</label>
-            <input type="number" min={10} max={7200} value={budget ?? BUDGET[preset]} onChange={(e) => setBudget(Number(e.currentTarget.value))} />
+        <details className="advanced">
+          <summary>{t('auto.advanced')}</summary>
+          <div className="form-grid">
+            <div className="field">
+              <label>{t('lib.test')}</label>
+              <input type="number" min={0} max={0.4} step={0.05} value={testFraction} onChange={(e) => setTestFraction(Number(e.currentTarget.value))} />
+            </div>
+            <div className="field">
+              <label>{t('lib.seed')}</label>
+              <input type="number" min={0} value={seed} onChange={(e) => setSeed(Number(e.currentTarget.value) >>> 0)} />
+            </div>
           </div>
-          <div className="field">
-            <label>{t('lib.test')}</label>
-            <input type="number" min={0} max={0.4} step={0.05} value={testFraction} onChange={(e) => setTestFraction(Number(e.currentTarget.value))} />
-          </div>
-          <div className="field">
-            <label>{t('lib.seed')}</label>
-            <input type="number" min={0} value={seed} onChange={(e) => setSeed(Number(e.currentTarget.value) >>> 0)} />
-          </div>
-          <button className="primary big" disabled={running || !table} onClick={run} data-testid="auto-run">{running ? t('lib.training') : t('auto.run')}</button>
+          <p className="small muted">{t('auto.how')}</p>
+        </details>
+        <div className="form-actions">
+          <button className="primary big" disabled={running || !table || !leak.ready} onClick={run} data-testid="auto-run">{running ? t('lib.training') : `▶ ${t('auto.run')}`}</button>
         </div>
-        <p className="small muted">{t('auto.how')}</p>
         {error && <div className="error-text">{error}</div>}
       </div>
       {taskId && (

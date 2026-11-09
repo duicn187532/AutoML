@@ -30,7 +30,7 @@ import { useProject } from './stores/project';
 import { useTasks } from './stores/tasks';
 
 /** Parse a data file (CSV / JSON / Excel / Parquet) in a worker and add it to the project. */
-export async function importCsvFile(name: string, bytes: ArrayBuffer, source: 'csv' | 'sample' = 'csv') {
+export async function importCsvFile(name: string, bytes: ArrayBuffer, source: 'csv' | 'sample' = 'csv', target?: string) {
   const size = bytes.byteLength;
   const fmt = detectFormat(name);
   const h = pool.submit({ kind: 'parseCsv', input: { bytes, fileName: name } }, { label: `${fmt.toUpperCase()} · ${name}`, transfer: [bytes], engines: fmt === 'xlsx' ? ['xlsx'] : [] });
@@ -39,6 +39,7 @@ export async function importCsvFile(name: string, bytes: ArrayBuffer, source: 'c
     name: name.replace(/\.(csv|tsv|txt|json|jsonl|ndjson|xlsx|xls|xlsm|ods|parquet|pq)$/i, ''),
     source: { type: source, fileName: name, bytes: size },
     warnings: warnings.length ? warnings : undefined,
+    target,
   });
 }
 

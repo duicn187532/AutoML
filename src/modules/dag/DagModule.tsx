@@ -10,6 +10,14 @@ import { graphToCode, type CodeTarget } from '@/core/dag/codegen';
 import { TEMPLATE_GROUPS, TEMPLATE_INFO } from './templateInfo';
 import { NODE_SPECS, analysisOk, analyze, template, type GNode, type Graph, type NodeType, type TemplateId } from '@/core/dag/graph';
 import type { DatasetRecord, GraphRecord } from '@/core/project/types';
+import { datasetTarget } from '@/core/project/target';
+import { NeedData, PageHeader } from '@/app/ui/Page';
+
+/** Head targets for templates: the dataset target first, then (for multi-task templates) the last two other columns. */
+const headTargets = (d: DatasetRecord) => {
+  const main = datasetTarget(d);
+  return [main, ...d.columns.filter((c) => c.name !== main).slice(-2).map((c) => c.name).reverse()];
+};
 import { safeFileName } from '@/core/security/escape';
 import { newId } from '@/core/util/id';
 import type { TrainGraphOutput } from '@/core/workers/types';
@@ -87,7 +95,7 @@ export function DagModule() {
   const datasetId = useUi((s) => s.datasetId) ?? project.datasets[0]?.id;
   const dataset = project.datasets.find((d) => d.id === datasetId);
   const stored = (project.graphs ?? [])[0];
-  const [rec, setRec] = useState<GraphRecord>(() => stored ?? { id: newId('g'), name: 'Network 1', datasetId, graph: template('mlp', dataset ? [dataset.columns.at(-1)!.name] : [], []), updatedAt: Date.now() });
+  const [rec, setRec] = useState<GraphRecord>(() => stored ?? { id: newId('g'), name: 'Network 1', datasetId, graph: template('mlp', dataset ? [datasetTarget(dataset)] : [], []), updatedAt: Date.now() });
   const graph = rec.graph;
   const [selected, setSelected] = useState<string[]>([]);
   const [undo, setUndo] = useState<Graph[]>([]);
@@ -119,7 +127,7 @@ export function DagModule() {
   const addNode = (type: NodeType) => {
     const id = newId(type[0]);
     const x = 80 + (graph.nodes.length % 6) * 40, y = 60 + (graph.nodes.length % 8) * 30;
-    commit({ ...graph, nodes: [...graph.nodes, { id, type, x, y, params: { ...NODE_SPECS[type].defaults, ...(type === 'head' ? { target: dataset?.columns.at(-1)?.name ?? '' } : {}) } }] });
+    commit({ ...graph, nodes: [...graph.nodes, { id, type, x, y, params: { ...NODE_SPECS[type].defaults, ...(type === 'head' ? { target: dataset ? datasetTarget(dataset) : '' } : {}) } }] });
     setSelected([id]);
   };
   const removeSelected = () => {
@@ -148,7 +156,7 @@ export function DagModule() {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  if (!dataset) return <div className="module"><h1>{t('nav.dag')}</h1><p className="muted">{t('panel.data.empty')}</p></div>;
+  if (!dataset) return <NeedData id="dag" />;
   const selNode = selected.length === 1 ? graph.nodes.find((n) => n.id === selected[0]) : undefined;
   const headTasks = Object.fromEntries(graph.nodes.filter((n) => n.type === 'head').map((n) => [n.id, (dims.targetDims[String(n.params.target)] ?? 1) > 1 ? 'classification' : 'regression']));
   const headDims = Object.fromEntries(graph.nodes.filter((n) => n.type === 'head').map((n) => [n.id, dims.targetDims[String(n.params.target)] ?? 1]));
@@ -164,11 +172,11 @@ export function DagModule() {
 
   return (
     <div className="module dag-module">
-      <h1>{t('nav.dag')}</h1>
+      <PageHeader id="dag" />
       <div className="card">
         <div className="row">
           <select value={dataset.id} onChange={(e) => useUi.getState().selectDataset(e.currentTarget.value)}>{project.datasets.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-          <select value="" onChange={(e) => { if (e.currentTarget.value) { const id = e.currentTarget.value as TemplateId; commit(template(id, [dataset.columns.at(-1)!.name, ...dataset.columns.slice(-3, -1).map((c) => c.name).reverse()], dims.features), id); setSelected([]); } }} data-testid="dag-template">
+          <select value="" onChange={(e) => { if (e.currentTarget.value) { const id = e.currentTarget.value as TemplateId; commit(template(id, headTargets(dataset), dims.features), id); setSelected([]); } }} data-testid="dag-template">
             <option value="">{t('dag.templates')}…</option>
             {TEMPLATE_GROUPS.map((g) => (
               <optgroup key={g} label={t(`dag.tplGroup.${g}` as MessageKey)}>

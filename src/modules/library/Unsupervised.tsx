@@ -61,7 +61,7 @@ export function Unsupervised({ dataset, table }: { dataset: DatasetRecord; table
     if (out.labels) extra.push({ name: `${method}_cluster`, kind: 'categorical', values: out.labels.map((l) => (l < 0 ? 'noise' : String(l))) });
     if (out.scores) extra.push({ name: `${method}_score`, kind: 'numeric', values: Float64Array.from(out.scores) }, { name: `${method}_anomaly`, kind: 'categorical', values: out.anomaly!.map(String) });
     if (out.components) out.components[0].forEach((_, j) => extra.push({ name: `${method}_${j + 1}`, kind: 'numeric', values: Float64Array.from(out.components!, (r) => r[j]) }));
-    const d = await addDataset({ rowCount: table.rowCount, columns: [...table.columns.filter((c) => !extra.some((e) => e.name === c.name)), ...extra] }, { name: `${dataset.name} + ${method}`, source: { type: 'derived' } });
+    const d = await addDataset({ rowCount: table.rowCount, columns: [...table.columns.filter((c) => !extra.some((e) => e.name === c.name)), ...extra] }, { name: `${dataset.name} + ${method}`, source: { type: 'derived' }, target: dataset.target });
     useUi.getState().selectDataset(d.id);
   };
   const spec = METHODS.find((m) => m.id === method)!;

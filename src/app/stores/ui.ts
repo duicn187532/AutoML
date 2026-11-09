@@ -1,7 +1,10 @@
 import { create } from 'zustand';
 
-export const MODULES = ['data', 'auto', 'library', 'dag', 'experiments', 'script'] as const;
+/** Main workflow first (data → train → results), then the expert tools. */
+export const MODULES = ['data', 'auto', 'experiments', 'library', 'dag', 'script'] as const;
 export type ModuleId = (typeof MODULES)[number];
+export const MAIN_MODULES: readonly ModuleId[] = ['data', 'auto', 'experiments'];
+export const ADVANCED_MODULES: readonly ModuleId[] = ['library', 'dag', 'script'];
 
 export interface LibraryPrefill {
   datasetId: string;
